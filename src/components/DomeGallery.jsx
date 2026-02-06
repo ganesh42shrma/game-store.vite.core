@@ -1,35 +1,38 @@
 import { useEffect, useMemo, useRef, useCallback } from 'react';
 import { useGesture } from '@use-gesture/react';
 
+/** Product cover image URLs (S3) for the dome gallery — used when no images prop is passed. */
 const DEFAULT_IMAGES = [
-  {
-    src: 'https://images.unsplash.com/photo-1755331039789-7e5680e26e8f?q=80&w=774&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    alt: 'Abstract art'
-  },
-  {
-    src: 'https://images.unsplash.com/photo-1755569309049-98410b94f66d?q=80&w=772&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    alt: 'Modern sculpture'
-  },
-  {
-    src: 'https://images.unsplash.com/photo-1755497595318-7e5e3523854f?q=80&w=774&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    alt: 'Digital artwork'
-  },
-  {
-    src: 'https://images.unsplash.com/photo-1755353985163-c2a0fe5ac3d8?q=80&w=774&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    alt: 'Contemporary art'
-  },
-  {
-    src: 'https://images.unsplash.com/photo-1745965976680-d00be7dc0377?q=80&w=774&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    alt: 'Geometric pattern'
-  },
-  {
-    src: 'https://images.unsplash.com/photo-1752588975228-21f44630bb3c?q=80&w=774&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    alt: 'Textured surface'
-  },
-  {
-    src: 'https://pbs.twimg.com/media/Gyla7NnXMAAXSo_?format=jpg&name=large',
-    alt: 'Social media image'
-  }
+  { src: 'https://developer-s3-mh-dev.s3.ap-south-1.amazonaws.com/products/6985abeaa85f7b955443eeff/cover-1770369036173.jpeg', alt: 'Metroid Dread' },
+  { src: 'https://developer-s3-mh-dev.s3.ap-south-1.amazonaws.com/products/6985abeaa85f7b955443ef00/cover-1770368837095.jpeg', alt: 'Starfield' },
+  { src: 'https://developer-s3-mh-dev.s3.ap-south-1.amazonaws.com/products/6985abeaa85f7b955443ef01/cover-1770369004712.webp', alt: 'Final Fantasy XVI' },
+  { src: 'https://developer-s3-mh-dev.s3.ap-south-1.amazonaws.com/products/6985abeaa85f7b955443ef02/cover-1770368812745.jpeg', alt: 'Mario Kart 8 Deluxe' },
+  { src: 'https://developer-s3-mh-dev.s3.ap-south-1.amazonaws.com/products/6985abeaa85f7b955443ef03/cover-1770368896138.jpg', alt: 'Sekiro: Shadows Die Twice' },
+  { src: 'https://developer-s3-mh-dev.s3.ap-south-1.amazonaws.com/default-gamr.avif', alt: 'Horizon Forbidden West' },
+  { src: 'https://developer-s3-mh-dev.s3.ap-south-1.amazonaws.com/products/6985abeaa85f7b955443ef05/cover-1770368903197.jpeg', alt: 'Sea of Thieves' },
+  { src: 'https://developer-s3-mh-dev.s3.ap-south-1.amazonaws.com/products/6985abeaa85f7b955443ef06/cover-1770368828834.jpeg', alt: 'Stardew Valley' },
+  { src: 'https://developer-s3-mh-dev.s3.ap-south-1.amazonaws.com/products/6985abeaa85f7b955443ef07/cover-1770368979387.jpeg', alt: 'Monster Hunter Rise' },
+  { src: 'https://developer-s3-mh-dev.s3.ap-south-1.amazonaws.com/products/6985abeaa85f7b955443ef08/cover-1770368924287.jpeg', alt: 'Dead Space Remake' },
+  { src: 'https://developer-s3-mh-dev.s3.ap-south-1.amazonaws.com/products/6985abeaa85f7b955443ef09/cover-1770369260538.jpeg', alt: "Ratchet & Clank: Rift Apart" },
+  { src: 'https://developer-s3-mh-dev.s3.ap-south-1.amazonaws.com/products/6985abeaa85f7b955443ef0a/cover-1770369282989.jpeg', alt: 'Hollow Knight' },
+  { src: 'https://developer-s3-mh-dev.s3.ap-south-1.amazonaws.com/products/6985abeaa85f7b955443eeee/cover-1770369320800.jpg', alt: 'Cyberpunk 2077' },
+  { src: 'https://developer-s3-mh-dev.s3.ap-south-1.amazonaws.com/products/6985abeaa85f7b955443eeef/cover-1770369345781.jpg', alt: 'God of War Ragnarok' },
+  { src: 'https://developer-s3-mh-dev.s3.ap-south-1.amazonaws.com/products/6985abeaa85f7b955443eef0/cover-1770369372063.jpg', alt: 'The Legend of Zelda: Tears of the Kingdom' },
+  { src: 'https://developer-s3-mh-dev.s3.ap-south-1.amazonaws.com/products/6985abeaa85f7b955443eef1/cover-1770369395846.jpg', alt: 'Super Mario Odyssey' },
+  { src: 'https://developer-s3-mh-dev.s3.ap-south-1.amazonaws.com/products/6985abeaa85f7b955443eef2/cover-1770369420907.png', alt: 'Halo Infinite' },
+  { src: 'https://developer-s3-mh-dev.s3.ap-south-1.amazonaws.com/products/6985abeaa85f7b955443eef3/cover-1770369451887.jpeg', alt: 'Forza Horizon 5' },
+  { src: "https://developer-s3-mh-dev.s3.ap-south-1.amazonaws.com/products/6985abeaa85f7b955443eef4/cover-1770369498923.jpeg", alt: "Marvel's Spider-Man 2" },
+  { src: "https://developer-s3-mh-dev.s3.ap-south-1.amazonaws.com/products/6985abeaa85f7b955443eef5/cover-1770369519645.jpeg", alt: "Baldur's Gate 3" },
+  { src: 'https://developer-s3-mh-dev.s3.ap-south-1.amazonaws.com/products/6985abeaa85f7b955443eef6/cover-1770369540198.jpeg', alt: 'Red Dead Redemption 2' },
+  { src: 'https://developer-s3-mh-dev.s3.ap-south-1.amazonaws.com/products/6985abeaa85f7b955443eef7/cover-1770369578080.jpeg', alt: 'The Last of Us Part II' },
+  { src: 'https://developer-s3-mh-dev.s3.ap-south-1.amazonaws.com/products/6985abeaa85f7b955443eef8/cover-1770369594542.jpeg', alt: 'Animal Crossing: New Horizons' },
+  { src: 'https://developer-s3-mh-dev.s3.ap-south-1.amazonaws.com/products/6985abeaa85f7b955443eef9/cover-1770369657094.webp', alt: 'Grand Theft Auto V' },
+  { src: 'https://developer-s3-mh-dev.s3.ap-south-1.amazonaws.com/products/6985abeaa85f7b955443eefa/cover-1770369667383.jpg', alt: 'EA Sports FC 24' },
+  { src: 'https://developer-s3-mh-dev.s3.ap-south-1.amazonaws.com/products/6985abeaa85f7b955443eefb/cover-1770369687648.jpeg', alt: 'Call of Duty: Modern Warfare III' },
+  { src: 'https://developer-s3-mh-dev.s3.ap-south-1.amazonaws.com/products/6985abeaa85f7b955443eefc/cover-1770369737141.jpeg', alt: 'Diablo IV' },
+  { src: 'https://developer-s3-mh-dev.s3.ap-south-1.amazonaws.com/products/6985abeaa85f7b955443eefd/cover-1770369745198.jpeg', alt: 'Hogwarts Legacy' },
+  { src: 'https://developer-s3-mh-dev.s3.ap-south-1.amazonaws.com/products/6985abeaa85f7b955443eefe/cover-1770369788762.webp', alt: 'Resident Evil 4 Remake' },
+  { src: 'https://developer-s3-mh-dev.s3.ap-south-1.amazonaws.com/products/6985abeaa85f7b955443eeed/cover-1770369796066.jpeg', alt: 'Elden Ring' }
 ];
 
 const DEFAULTS = {

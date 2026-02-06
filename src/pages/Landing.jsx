@@ -1,9 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
-import { getProducts } from '../api/products.js';
 import DomeGallery from '../components/DomeGallery.jsx';
 
 export default function Landing() {
@@ -13,29 +12,6 @@ export default function Landing() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const [featuredGames, setFeaturedGames] = useState([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    getProducts({ limit: 20 })
-      .then((data) => {
-        if (cancelled) return;
-        const list = Array.isArray(data) ? data : data?.data ?? [];
-        setFeaturedGames(list);
-      })
-      .catch(() => {
-        if (!cancelled) setFeaturedGames([]);
-      });
-    return () => { cancelled = true; };
-  }, []);
-
-  const galleryImages = useMemo(() => {
-    if (featuredGames.length === 0) return undefined;
-    return featuredGames.map((game) => ({
-      src: game.coverImage || game.image || game.imageUrl || '',
-      alt: game.title || game.name || 'Game'
-    })).filter((img) => img.src);
-  }, [featuredGames]);
 
   if (user) {
     return <Navigate to="/home" replace />;
@@ -111,7 +87,6 @@ export default function Landing() {
           transition={{ duration: 0.6, ease: 'easeOut' }}
         >
           <DomeGallery
-            images={galleryImages?.length ? galleryImages : undefined}
             fit={0.8}
             minRadius={600}
             maxVerticalRotationDeg={0}
