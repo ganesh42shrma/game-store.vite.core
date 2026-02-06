@@ -63,19 +63,28 @@ export default function Orders() {
         <ul className="space-y-4">
           {orders.map((order) => {
             const id = order._id;
-            const total = order.total != null ? Number(order.total) : 0;
+            const total = order.totalAmount != null ? Number(order.totalAmount) : (order.total != null ? Number(order.total) : 0);
             const status = order.status || '—';
             const createdAt = order.createdAt ? new Date(order.createdAt).toLocaleDateString() : '—';
+            const items = order.items ?? [];
+            const summary = items.length > 0
+              ? items.map((it) => it.title || it.product?.title || it.product?.name || 'Item').filter(Boolean).join(', ')
+              : null;
             return (
               <li key={id} className="border border-gray-200 rounded-lg p-4 bg-white">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <Link to={`/orders/${id}`} className="font-medium text-gray-900 hover:underline">
                       Order {id?.slice(-8) ?? id}
                     </Link>
                     <p className="text-gray-500 text-sm mt-1">{createdAt} · {status}</p>
+                    {summary && (
+                      <p className="text-gray-600 text-sm mt-1 truncate" title={summary}>
+                        {items.length} item{items.length !== 1 ? 's' : ''}: {summary}
+                      </p>
+                    )}
                   </div>
-                  <p className="font-medium text-gray-900">${total.toFixed(2)}</p>
+                  <p className="font-medium text-gray-900 shrink-0">${total.toFixed(2)}</p>
                 </div>
               </li>
             );

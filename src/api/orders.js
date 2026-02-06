@@ -16,8 +16,10 @@ export async function getOrders(params = {}) {
   return { data, meta };
 }
 
+/** Returns single order (unwrap { data } if present). */
 export async function getOrder(id) {
-  return api(`/api/orders/${id}`);
+  const res = await api(`/api/orders/${id}`);
+  return res?.data ?? res;
 }
 
 export async function updateOrder(id, body) {

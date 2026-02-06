@@ -35,7 +35,7 @@ export default function OrderDetail() {
   if (!order) return <div className="text-gray-600 py-12">Order not found.</div>;
 
   const items = order.items ?? order.products ?? [];
-  const total = order.total != null ? Number(order.total) : 0;
+  const total = order.totalAmount != null ? Number(order.totalAmount) : (order.total != null ? Number(order.total) : 0);
   const status = order.status || '—';
   const createdAt = order.createdAt ? new Date(order.createdAt).toLocaleString() : '—';
 
@@ -48,8 +48,8 @@ export default function OrderDetail() {
         <ul className="space-y-2 text-gray-700">
           {items.map((item, i) => {
             const product = item.product || item;
-            const name = product.name || product.title || 'Item';
-            const price = product.price != null ? Number(product.price) : 0;
+            const name = item.title ?? product?.title ?? product?.name ?? 'Item';
+            const price = item.price != null ? Number(item.price) : (product?.price != null ? Number(product.price) : 0);
             const qty = item.quantity ?? 1;
             return (
               <li key={i} className="flex justify-between">

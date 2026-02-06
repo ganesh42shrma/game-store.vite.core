@@ -57,7 +57,7 @@ export default function AdminOrders() {
               </tr>
             ) : (
               orders.map((order) => {
-                const total = order.total != null ? Number(order.total) : 0;
+                const total = order.totalAmount != null ? Number(order.totalAmount) : (order.total != null ? Number(order.total) : 0);
                 const createdAt = order.createdAt ? new Date(order.createdAt).toLocaleDateString() : '—';
                 const status = order.status || '—';
                 return (
