@@ -1,18 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getProduct } from '../api/products.js';
+import { getGame } from '../api/games.js';
 import { addCartItem } from '../api/cart.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
-import ProductDetailSkeleton from '../components/loaders/ProductDetailSkeleton.jsx';
-import ProductReviewVideos from '../components/ProductReviewVideos.jsx';
+import GameDetailSkeleton from '../components/loaders/GameDetailSkeleton.jsx';
+import GameReviewVideos from '../components/GameReviewVideos.jsx';
 
-export default function ProductDetail() {
+export default function GameDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { getQuantity, refreshCart } = useCart();
-  const [product, setProduct] = useState(null);
+  const [game, setGame] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [adding, setAdding] = useState(false);
@@ -20,9 +20,9 @@ export default function ProductDetail() {
 
   useEffect(() => {
     let cancelled = false;
-    getProduct(id)
+    getGame(id)
       .then((data) => {
-        if (!cancelled) setProduct(data);
+        if (!cancelled) setGame(data);
       })
       .catch((err) => {
         if (!cancelled) setError(err.message || 'Game not found');
@@ -41,7 +41,7 @@ export default function ProductDetail() {
     setAdding(true);
     setMessage(null);
     try {
-      await addCartItem(product._id, 1);
+      await addCartItem(game._id, 1);
       refreshCart();
       setMessage('Added to cart');
     } catch (err) {
@@ -59,7 +59,7 @@ export default function ProductDetail() {
     setAdding(true);
     setMessage(null);
     try {
-      await addCartItem(product._id, 1);
+      await addCartItem(game._id, 1);
       refreshCart();
       navigate('/cart');
     } catch (err) {
@@ -70,9 +70,9 @@ export default function ProductDetail() {
   };
 
   if (loading) {
-    return <ProductDetailSkeleton />;
+    return <GameDetailSkeleton />;
   }
-  if (error || !product) {
+  if (error || !game) {
     return (
       <div className="text-red-600 py-12">
         {error || 'Game not found'}
@@ -80,11 +80,11 @@ export default function ProductDetail() {
     );
   }
 
-  const name = product.title || product.name || 'Game';
-  const price = product.price != null ? Number(product.price) : 0;
-  const description = product.description || '';
-  const image = product.coverImage || product.image || product.imageUrl;
-  const inCartQty = user ? getQuantity(product._id) : 0;
+  const name = game.title || game.name || 'Game';
+  const price = game.price != null ? Number(game.price) : 0;
+  const description = game.description || '';
+  const image = game.coverImage || game.image || game.imageUrl;
+  const inCartQty = user ? getQuantity(game._id) : 0;
 
   return (
     <div className="max-w-2xl">
@@ -132,7 +132,7 @@ export default function ProductDetail() {
           </div>
         </div>
       </div>
-      <ProductReviewVideos links={product.youtubeLinks} />
+      <GameReviewVideos links={game.youtubeLinks} />
     </div>
   );
 }

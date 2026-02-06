@@ -8,7 +8,7 @@ export default function AdminLayout() {
           to="/admin/products"
           className="text-gray-600 hover:text-gray-900 font-medium"
         >
-          Products
+          Games
         </Link>
         <Link
           to="/admin/orders"

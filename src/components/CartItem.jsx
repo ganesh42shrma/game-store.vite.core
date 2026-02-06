@@ -4,7 +4,7 @@ import { updateCartItem, removeCartItem } from '../api/cart.js';
 export default function CartItem({ item, onUpdate, onRemove }) {
   const product = item.product || item;
   const productId = product._id || item.productId;
-  const name = product.name || product.title || 'Product';
+  const name = product.name || product.title || 'Game';
   const price = product.price != null ? Number(product.price) : 0;
   const quantity = item.quantity ?? 1;
   const lineTotal = price * quantity;

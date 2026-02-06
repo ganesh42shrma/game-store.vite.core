@@ -58,7 +58,7 @@ export default function Orders() {
     <div>
       <h1 className="text-2xl font-semibold text-gray-900 mb-6">Orders</h1>
       {orders.length === 0 ? (
-        <p className="text-gray-600">No orders yet. <Link to="/" className="text-gray-900 underline">Browse products</Link>.</p>
+        <p className="text-gray-600">No orders yet. <Link to="/" className="text-gray-900 underline">Browse games</Link>.</p>
       ) : (
         <ul className="space-y-4">
           {orders.map((order) => {

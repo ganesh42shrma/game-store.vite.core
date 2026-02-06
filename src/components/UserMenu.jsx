@@ -36,6 +36,9 @@ export default function UserMenu() {
         aria-expanded={open}
         aria-haspopup="true"
       >
+        <span className="sr-only md:not-sr-only md:inline text-sm max-w-[120px] truncate">
+          {user.name || user.email}
+        </span>
         {avatarUrl ? (
           <img
             src={avatarUrl}
@@ -45,9 +48,6 @@ export default function UserMenu() {
         ) : (
           <User className="w-5 h-5 text-gray-900" />
         )}
-        <span className="sr-only md:not-sr-only md:inline text-sm max-w-[120px] truncate">
-          {user.name || user.email}
-        </span>
       </button>
       {open && (
         <div className="absolute right-0 top-full mt-1 py-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">

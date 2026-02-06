@@ -60,12 +60,12 @@ export default function AdminProducts() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">Manage products</h1>
+        <h1 className="text-2xl font-semibold text-gray-900">Manage games</h1>
         <Link
           to="/admin/products/new"
           className="px-4 py-2 bg-gray-900 text-white rounded border border-gray-900"
         >
-          Add product
+          Add game
         </Link>
       </div>
       <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
@@ -81,7 +81,7 @@ export default function AdminProducts() {
             {products.length === 0 ? (
               <tr>
                 <td colSpan={3} className="px-4 py-8 text-gray-500 text-center">
-                  No products. Add one above.
+                  No games. Add one above.
                 </td>
               </tr>
             ) : (

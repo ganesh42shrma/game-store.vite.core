@@ -2,7 +2,9 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { getProduct, createProduct, updateProduct, uploadProductImage } from '../../api/products.js';
 import FormSkeleton from '../../components/loaders/FormSkeleton.jsx';
-import { Upload, X, Image as ImageIcon } from 'lucide-react';
+import { Upload, X, Image as ImageIcon, Plus } from 'lucide-react';
+
+const MAX_YOUTUBE_LINKS = 3;
 
 const PLATFORMS = ['PC', 'PS5', 'XBOX', 'SWITCH'];
 const ACCEPT_IMAGE = 'image/jpeg,image/png,image/gif,image/webp';
@@ -70,6 +72,7 @@ export default function AdminProductForm() {
     platform: 'PC',
     genre: '',
     stock: '0',
+    youtubeLinks: [],
   });
 
   const errors = {
@@ -96,6 +99,7 @@ export default function AdminProductForm() {
           platform: data.platform ?? 'PC',
           genre: data.genre ?? '',
           stock: data.stock != null ? String(data.stock) : '0',
+          youtubeLinks: Array.isArray(data.youtubeLinks) ? [...data.youtubeLinks] : [],
         });
         if (data.coverImage) setExistingCoverUrl(data.coverImage);
       })
@@ -147,6 +151,10 @@ export default function AdminProductForm() {
     }
     setError('');
     setSaving(true);
+    const youtubeLinks = (form.youtubeLinks ?? [])
+      .map((u) => (typeof u === 'string' ? u.trim() : ''))
+      .filter(Boolean)
+      .slice(0, MAX_YOUTUBE_LINKS);
     const payload = {
       title: form.title.trim(),
       description: form.description.trim(),
@@ -154,6 +162,7 @@ export default function AdminProductForm() {
       platform: form.platform,
       genre: form.genre.trim(),
       stock: Math.max(0, parseInt(form.stock, 10) || 0),
+      youtubeLinks,
     };
     try {
       let productId = id;
@@ -184,9 +193,9 @@ export default function AdminProductForm() {
 
   return (
     <div>
-      <Link to="/admin/products" className="text-gray-600 hover:text-gray-900 text-sm mb-4 inline-block">← Products</Link>
+      <Link to="/admin/products" className="text-gray-600 hover:text-gray-900 text-sm mb-4 inline-block">← Games</Link>
       <h1 className="text-2xl font-semibold text-gray-900 mb-6">
-        {isEdit ? 'Edit product' : 'Add product'}
+        {isEdit ? 'Edit game' : 'Add game'}
       </h1>
       <form onSubmit={handleSubmit} className="max-w-lg space-y-5">
         {error && (
@@ -283,6 +292,54 @@ export default function AdminProductForm() {
               className={`w-full border rounded px-3 py-2 text-gray-900 placeholder-gray-400 ${inputErrorClass('genre')}`}
             />
             {showError('genre') && <p className="mt-1 text-sm text-red-600">{errors.genre}</p>}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Review / YouTube links (optional, max {MAX_YOUTUBE_LINKS})</label>
+          <p className="text-gray-500 text-xs mb-2">YouTube watch or youtu.be links. Shown as embedded videos on the game page.</p>
+          <div className="space-y-2">
+            {(form.youtubeLinks ?? []).map((url, index) => (
+              <div key={index} className="flex gap-2">
+                <input
+                  type="url"
+                  value={url}
+                  onChange={(e) => {
+                    const next = [...(form.youtubeLinks ?? [])];
+                    next[index] = e.target.value;
+                    setForm((f) => ({ ...f, youtubeLinks: next }));
+                  }}
+                  placeholder="https://www.youtube.com/watch?v=... or https://youtu.be/..."
+                  className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 placeholder-gray-400"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = (form.youtubeLinks ?? []).filter((_, i) => i !== index);
+                    setForm((f) => ({ ...f, youtubeLinks: next }));
+                  }}
+                  className="p-2 text-gray-500 hover:text-red-600 rounded border border-gray-300 hover:border-red-300"
+                  title="Remove link"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+            {(form.youtubeLinks ?? []).length < MAX_YOUTUBE_LINKS && (
+              <button
+                type="button"
+                onClick={() =>
+                  setForm((f) => ({
+                    ...f,
+                    youtubeLinks: [...(f.youtubeLinks ?? []), ''],
+                  }))
+                }
+                className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900"
+              >
+                <Plus className="w-4 h-4" />
+                Add link
+              </button>
+            )}
           </div>
         </div>
 

@@ -72,7 +72,7 @@ export default function Checkout() {
         <ul className="space-y-2 text-gray-700">
           {items.map((item) => {
             const product = item.product || item;
-            const name = product.name || product.title || 'Product';
+            const name = product.name || product.title || 'Game';
             const price = product.price != null ? Number(product.price) : 0;
             const qty = item.quantity ?? 1;
             return (
