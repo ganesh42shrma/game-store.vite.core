@@ -36,21 +36,25 @@ export default function Layout() {
                       Home
                     </Link>
                   )}
-                  <Link to="/cart" className="flex items-center gap-1.5 text-gray-900 hover:text-gray-700" title="Cart">
-                    <span className="relative inline-flex">
-                      <ShoppingCart className={iconClass} />
-                      {totalItems > 0 && (
-                        <span className="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1 flex items-center justify-center rounded-full bg-gray-900 text-white text-xs font-medium">
-                          {totalItems > 99 ? '99+' : totalItems}
+                  {!isAdmin && (
+                    <>
+                      <Link to="/cart" className="flex items-center gap-1.5 text-gray-900 hover:text-gray-700" title="Cart">
+                        <span className="relative inline-flex">
+                          <ShoppingCart className={iconClass} />
+                          {totalItems > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1 flex items-center justify-center rounded-full bg-gray-900 text-white text-xs font-medium">
+                              {totalItems > 99 ? '99+' : totalItems}
+                            </span>
+                          )}
                         </span>
-                      )}
-                    </span>
-                    <span className="sr-only md:not-sr-only md:inline">Cart</span>
-                  </Link>
-                  <Link to="/orders" className={`flex items-center gap-1.5 ${isOrders ? 'text-gray-900 font-medium' : 'text-gray-900 hover:text-gray-700'}`} title="Orders">
-                    <Package className={iconClass} />
-                    <span className="sr-only md:not-sr-only md:inline">Orders</span>
-                  </Link>
+                        <span className="sr-only md:not-sr-only md:inline">Cart</span>
+                      </Link>
+                      <Link to="/orders" className={`flex items-center gap-1.5 ${isOrders ? 'text-gray-900 font-medium' : 'text-gray-900 hover:text-gray-700'}`} title="Orders">
+                        <Package className={iconClass} />
+                        <span className="sr-only md:not-sr-only md:inline">Orders</span>
+                      </Link>
+                    </>
+                  )}
                   {isAdmin && (
                     <Link to="/admin/products" className="text-gray-900 hover:text-gray-700">
                       Admin
@@ -84,8 +88,12 @@ export default function Layout() {
               </Link>
               <nav className="flex flex-wrap items-center justify-center gap-6 text-sm text-gray-600">
                 <Link to="/home" className="hover:text-gray-900">Home</Link>
-                <Link to="/cart" className="hover:text-gray-900">Cart</Link>
-                <Link to="/orders" className="hover:text-gray-900">Orders</Link>
+                {!isAdmin && (
+                  <>
+                    <Link to="/cart" className="hover:text-gray-900">Cart</Link>
+                    <Link to="/orders" className="hover:text-gray-900">Orders</Link>
+                  </>
+                )}
                 <Link to="/profile" className="hover:text-gray-900">Profile</Link>
                 {isAdmin && (
                   <Link to="/admin/products" className="hover:text-gray-900">Admin</Link>

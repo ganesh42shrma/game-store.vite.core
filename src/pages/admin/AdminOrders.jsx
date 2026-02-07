@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getOrders } from '../../api/orders.js';
+import { getAdminOrders } from '../../api/orders.js';
 import PaginationBar from '../../components/PaginationBar.jsx';
 import TableSkeleton from '../../components/loaders/TableSkeleton.jsx';
 
@@ -15,12 +15,17 @@ export default function AdminOrders() {
 
   useEffect(() => {
     setLoading(true);
-    getOrders({ page, limit: ORDERS_PER_PAGE })
+    setError(null);
+    getAdminOrders({ page, limit: ORDERS_PER_PAGE })
       .then(({ data, meta: m }) => {
         setOrders(Array.isArray(data) ? data : []);
         setMeta(m || null);
       })
-      .catch((err) => setError(err.message))
+      .catch((err) => {
+        setOrders([]);
+        setMeta(null);
+        setError(err.message || (err.status === 404 ? 'Backend does not yet expose GET /api/admin/orders.' : 'Failed to load orders.'));
+      })
       .finally(() => setLoading(false));
   }, [page]);
 
@@ -36,12 +41,13 @@ export default function AdminOrders() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-gray-900 mb-6">Manage orders</h1>
+      <h1 className="text-2xl font-semibold text-gray-900 mb-6">All orders</h1>
       <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
         <table className="w-full text-left">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <th className="px-4 py-3 text-sm font-medium text-gray-700">Order</th>
+              <th className="px-4 py-3 text-sm font-medium text-gray-700">User</th>
               <th className="px-4 py-3 text-sm font-medium text-gray-700">Date</th>
               <th className="px-4 py-3 text-sm font-medium text-gray-700">Status</th>
               <th className="px-4 py-3 text-sm font-medium text-gray-700">Total</th>
@@ -51,7 +57,7 @@ export default function AdminOrders() {
           <tbody>
             {orders.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-gray-500 text-center">
+                <td colSpan={6} className="px-4 py-8 text-gray-500 text-center">
                   No orders yet.
                 </td>
               </tr>
@@ -60,11 +66,14 @@ export default function AdminOrders() {
                 const total = order.totalAmount != null ? Number(order.totalAmount) : (order.total != null ? Number(order.total) : 0);
                 const createdAt = order.createdAt ? new Date(order.createdAt).toLocaleDateString() : '—';
                 const status = order.status || '—';
+                const userObj = typeof order.user === 'object' ? order.user : null;
+                const userLabel = userObj ? (userObj.email || userObj.name || order.user) : (order.user ?? '—');
                 return (
                   <tr key={order._id} className="border-b border-gray-100 last:border-0">
                     <td className="px-4 py-3 font-medium text-gray-900">
                       {order._id?.slice(-8) ?? order._id}
                     </td>
+                    <td className="px-4 py-3 text-gray-600">{userLabel}</td>
                     <td className="px-4 py-3 text-gray-600">{createdAt}</td>
                     <td className="px-4 py-3 text-gray-600">{status}</td>
                     <td className="px-4 py-3 text-gray-600">${total.toFixed(2)}</td>

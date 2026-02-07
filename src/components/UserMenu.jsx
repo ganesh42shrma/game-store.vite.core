@@ -25,20 +25,21 @@ export default function UserMenu() {
 
   if (!user) return null;
 
-  const avatarUrl = user.avatarUrl || getAvatarUrl(user.id || user.email);
+  const avatarUrl = user.profilePicture || getAvatarUrl(user.id || user.email);
 
   return (
     <div className="relative" ref={ref}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 text-gray-900 hover:text-gray-700"
+        className="flex items-center gap-2 text-gray-900 hover:text-gray-700 min-w-0"
         aria-expanded={open}
         aria-haspopup="true"
       >
-        <span className="sr-only md:not-sr-only md:inline text-sm max-w-[120px] truncate">
-          {user.name || user.email}
+        <span className="sr-only md:not-sr-only md:inline-block text-sm min-w-0 max-w-[120px] truncate">
+          {user.name || 'User'}
         </span>
+        <span className="shrink-0">
         {avatarUrl ? (
           <img
             src={avatarUrl}
@@ -48,6 +49,7 @@ export default function UserMenu() {
         ) : (
           <User className="w-5 h-5 text-gray-900" />
         )}
+        </span>
       </button>
       {open && (
         <div className="absolute right-0 top-full mt-1 py-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">

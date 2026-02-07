@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { getCart, clearCart } from '../api/cart.js';
@@ -7,7 +7,8 @@ import CartItem from '../components/CartItem.jsx';
 import CartSkeleton from '../components/loaders/CartSkeleton.jsx';
 
 export default function Cart() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
+  const navigate = useNavigate();
   const { refreshCart } = useCart();
   const [cart, setCart] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -39,6 +40,10 @@ export default function Cart() {
   };
 
   useEffect(() => {
+    if (isAdmin) {
+      navigate('/admin', { replace: true });
+      return;
+    }
     if (!user) {
       setLoading(false);
       return;
@@ -48,8 +53,9 @@ export default function Cart() {
       .then(setCart)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [user]);
+  }, [user, isAdmin, navigate]);
 
+  if (isAdmin) return null;
   if (!user) {
     return (
       <div className="py-12 text-center text-gray-600">

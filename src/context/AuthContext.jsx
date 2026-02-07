@@ -1,5 +1,6 @@
-import { createContext, useCallback, useContext, useState } from 'react';
+import { createContext, useCallback, useContext, useState, useEffect } from 'react';
 import * as authApi from '../api/auth.js';
+import * as usersApi from '../api/users.js';
 import { getToken } from '../api/client.js';
 
 const DICEBEAR_BASE = 'https://api.dicebear.com/9.x/lorelei/svg';
@@ -30,14 +31,47 @@ export function AuthProvider({ children }) {
     const payload = decodeJwtPayload(token);
     if (!payload) return null;
     const role = payload.role ?? 'user';
+    const id = payload.id ?? payload._id ?? payload.sub;
     return {
-      id: payload.id ?? payload._id ?? payload.sub,
+      id,
       email: payload.email ?? payload.sub,
       name: payload.name ?? null,
       role,
+      profilePicture: payload.profilePicture ?? null,
     };
   });
   const [loading, setLoading] = useState(false);
+
+  // After load with a token, fetch full profile (name, profilePicture) via GET /api/users/me
+  useEffect(() => {
+    const token = getToken();
+    if (!token) return;
+    let cancelled = false;
+    usersApi
+      .getMe()
+      .then((data) => {
+        if (cancelled) return;
+        setUser((prev) =>
+          prev
+            ? {
+                ...prev,
+                id: data?._id ?? data?.id ?? prev.id,
+                name: data?.name ?? prev.name,
+                email: data?.email ?? prev.email,
+                profilePicture: data?.profilePicture ?? prev.profilePicture,
+              }
+            : null
+        );
+      })
+      .catch(() => {
+        if (!cancelled) {
+          // Keep current user from JWT on 401/network error
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const login = useCallback(async (email, password) => {
     setLoading(true);
@@ -51,8 +85,8 @@ export function AuthProvider({ children }) {
         email: userFromApi.email ?? email,
         name: userFromApi.name ?? null,
         role,
-        avatarUrl: getAvatarUrl(avatarSeed),
-      } : { id: null, email: data?.email ?? email, name: null, role: 'user', avatarUrl: getAvatarUrl(avatarSeed) });
+        profilePicture: userFromApi.profilePicture ?? null,
+      } : { id: null, email: data?.email ?? email, name: null, role: 'user', profilePicture: null });
       return data;
     } finally {
       setLoading(false);
@@ -71,8 +105,8 @@ export function AuthProvider({ children }) {
         email: userFromApi.email ?? email,
         name: userFromApi.name ?? name ?? null,
         role,
-        avatarUrl: getAvatarUrl(avatarSeed),
-      } : { id: null, email: data?.email ?? email, name: name ?? null, role: 'user', avatarUrl: getAvatarUrl(avatarSeed) });
+        profilePicture: userFromApi.profilePicture ?? null,
+      } : { id: null, email: data?.email ?? email, name: name ?? null, role: 'user', profilePicture: null });
       return data;
     } finally {
       setLoading(false);

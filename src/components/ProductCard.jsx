@@ -5,7 +5,7 @@ import { useCart } from '../context/CartContext.jsx';
 import { addCartItem } from '../api/cart.js';
 
 export default function ProductCard({ product }) {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { getQuantity, refreshCart } = useCart();
   const navigate = useNavigate();
   const [adding, setAdding] = useState(false);
@@ -70,7 +70,7 @@ export default function ProductCard({ product }) {
           <p className="text-gray-600 mt-1">${price.toFixed(2)}</p>
         </div>
       </Link>
-      {user && (
+      {user && !isAdmin && (
         <div className="p-4 pt-0 space-y-2" onClick={(e) => e.preventDefault()}>
           {inCartQty > 0 && (
             <p className="text-sm text-gray-600">

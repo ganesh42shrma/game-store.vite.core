@@ -21,8 +21,13 @@ export default function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      setError('Name is required.');
+      return;
+    }
     try {
-      await register(email, password, name || undefined);
+      await register(email, password, trimmedName);
       navigate('/', { replace: true });
     } catch (err) {
       setError(err.message || err.data?.message || 'Registration failed');
@@ -109,13 +114,14 @@ export default function Register() {
             )}
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-                Name (optional)
+                Name
               </label>
               <input
                 id="name"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                required
                 className="w-full border border-gray-300 rounded px-3 py-2 text-gray-900"
               />
             </div>

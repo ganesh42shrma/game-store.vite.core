@@ -5,7 +5,10 @@ function unwrap(res) {
 }
 
 export async function getProducts(params = {}) {
-  const search = new URLSearchParams(params).toString();
+  const cleaned = Object.fromEntries(
+    Object.entries(params).filter(([, v]) => v != null && v !== '')
+  );
+  const search = new URLSearchParams(cleaned).toString();
   const path = search ? `/api/products?${search}` : '/api/products';
   const res = await api(path);
   return unwrap(res);

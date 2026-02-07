@@ -11,11 +11,19 @@ import Cart from './pages/Cart.jsx';
 import Checkout from './pages/Checkout.jsx';
 import Orders from './pages/Orders.jsx';
 import OrderDetail from './pages/OrderDetail.jsx';
+import OrderSuccess from './pages/OrderSuccess.jsx';
 import Profile from './pages/Profile.jsx';
+import Addresses from './pages/Addresses.jsx';
+import CheckoutPay from './pages/CheckoutPay.jsx';
+import InvoiceView from './pages/InvoiceView.jsx';
 import AdminProducts from './pages/admin/AdminProducts.jsx';
 import AdminProductForm from './pages/admin/AdminProductForm.jsx';
 import AdminOrders from './pages/admin/AdminOrders.jsx';
 import AdminOrderDetail from './pages/admin/AdminOrderDetail.jsx';
+import AdminInvoices from './pages/admin/AdminInvoices.jsx';
+import AdminInvoiceDetail from './pages/admin/AdminInvoiceDetail.jsx';
+import AdminUsers from './pages/admin/AdminUsers.jsx';
+import AdminUserForm from './pages/admin/AdminUserForm.jsx';
 
 const router = createBrowserRouter([
   {
@@ -44,6 +52,22 @@ const router = createBrowserRouter([
         ),
       },
       {
+        path: 'checkout/pay',
+        element: (
+          <ProtectedRoute>
+            <CheckoutPay />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'pay/:paymentId',
+        element: (
+          <ProtectedRoute>
+            <CheckoutPay />
+          </ProtectedRoute>
+        ),
+      },
+      {
         path: 'orders',
         element: (
           <ProtectedRoute>
@@ -60,10 +84,34 @@ const router = createBrowserRouter([
         ),
       },
       {
+        path: 'orders/:id/success',
+        element: (
+          <ProtectedRoute>
+            <OrderSuccess />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'orders/:id/invoice',
+        element: (
+          <ProtectedRoute>
+            <InvoiceView />
+          </ProtectedRoute>
+        ),
+      },
+      {
         path: 'profile',
         element: (
           <ProtectedRoute>
             <Profile />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'profile/addresses',
+        element: (
+          <ProtectedRoute>
+            <Addresses />
           </ProtectedRoute>
         ),
       },
@@ -81,6 +129,11 @@ const router = createBrowserRouter([
           { path: 'products/:id/edit', element: <AdminProductForm /> },
           { path: 'orders', element: <AdminOrders /> },
           { path: 'orders/:id', element: <AdminOrderDetail /> },
+          { path: 'invoices', element: <AdminInvoices /> },
+          { path: 'invoices/:id', element: <AdminInvoiceDetail /> },
+          { path: 'users', element: <AdminUsers /> },
+          { path: 'users/new', element: <AdminUserForm /> },
+          { path: 'users/:id', element: <AdminUserForm /> },
         ],
       },
     ],
