@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { getProduct, createProduct, updateProduct, uploadProductImage, getProductTags } from '../../api/products.js';
 import FormSkeleton from '../../components/loaders/FormSkeleton.jsx';
-import { Upload, X, Image as ImageIcon, Plus } from 'lucide-react';
+import { Upload, X, Image as ImageIcon, Plus, EyeOff, PackageX } from 'lucide-react';
 
 const MAX_YOUTUBE_LINKS = 3;
 const MAX_TAGS = 20;
@@ -48,6 +48,15 @@ function validateStock(value) {
   return null;
 }
 
+function validateDiscountedPrice(value, priceNum, isOnSale) {
+  if (!isOnSale || value === '' || value == null) return null;
+  const n = parseFloat(value);
+  if (Number.isNaN(n)) return 'Enter a valid number';
+  if (n < 0) return 'Discounted price must be ≥ 0';
+  if (priceNum != null && Number.isFinite(priceNum) && n >= priceNum) return 'Discounted price must be less than original price';
+  return null;
+}
+
 function validateShortDescription(value) {
   if (!value || !value.trim()) return null;
   if (value.length > MAX_SHORT_DESC) return `Max ${MAX_SHORT_DESC} characters`;
@@ -82,12 +91,16 @@ export default function AdminProductForm() {
     platform: 'PC',
     genre: '',
     stock: '0',
+    isActive: true,
+    isOnSale: false,
+    discountedPrice: '',
     youtubeLinks: [],
     tags: [],
   });
   const [tagInput, setTagInput] = useState('');
   const [existingTags, setExistingTags] = useState([]);
 
+  const priceNum = form.price !== '' && !Number.isNaN(parseFloat(form.price)) ? parseFloat(form.price) : null;
   const errors = {
     title: validateTitle(form.title),
     description: validateDescription(form.description),
@@ -95,6 +108,7 @@ export default function AdminProductForm() {
     price: validatePrice(form.price),
     genre: validateGenre(form.genre),
     stock: validateStock(form.stock),
+    discountedPrice: validateDiscountedPrice(form.discountedPrice, priceNum, form.isOnSale),
     image: validateImageFile(imageFile),
   };
 
@@ -118,6 +132,9 @@ export default function AdminProductForm() {
           platform: data.platform ?? 'PC',
           genre: data.genre ?? '',
           stock: data.stock != null ? String(data.stock) : '0',
+          isActive: data.isActive !== false,
+          isOnSale: data.isOnSale === true,
+          discountedPrice: data.discountedPrice != null ? String(data.discountedPrice) : '',
           youtubeLinks: Array.isArray(data.youtubeLinks) ? [...data.youtubeLinks] : [],
           tags: Array.isArray(data.tags) ? data.tags.map((t) => String(t).trim()).filter(Boolean) : [],
         });
@@ -179,7 +196,7 @@ export default function AdminProductForm() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setTouched({ title: true, description: true, shortDescription: true, price: true, genre: true, stock: true });
+    setTouched({ title: true, description: true, shortDescription: true, price: true, genre: true, stock: true, discountedPrice: form.isOnSale });
     const hasErrors = Object.values(errors).some(Boolean);
     if (hasErrors) {
       setError('Please fix the errors below.');
@@ -200,6 +217,9 @@ export default function AdminProductForm() {
       platform: form.platform,
       genre: form.genre.trim(),
       stock: Math.max(0, parseInt(form.stock, 10) || 0),
+      isActive: form.isActive !== false,
+      isOnSale: form.isOnSale === true,
+      discountedPrice: form.isOnSale && form.discountedPrice.trim() !== '' ? (parseFloat(form.discountedPrice) || null) : null,
       youtubeLinks,
       tags,
     };
@@ -370,19 +390,83 @@ export default function AdminProductForm() {
           </div>
           <div>
             <label htmlFor="stock" className="block text-sm font-medium text-gray-700 mb-1">Stock</label>
-            <input
-              id="stock"
-              type="number"
-              min="0"
-              step="1"
-              value={form.stock}
-              onChange={(e) => setForm((f) => ({ ...f, stock: e.target.value }))}
-              onBlur={() => setTouchedField('stock')}
-              placeholder="0"
-              className={`w-full border rounded px-3 py-2 text-gray-900 placeholder-gray-400 ${inputErrorClass('stock')}`}
-            />
+            <div className="flex gap-2">
+              <input
+                id="stock"
+                type="number"
+                min="0"
+                step="1"
+                value={form.stock}
+                onChange={(e) => setForm((f) => ({ ...f, stock: e.target.value }))}
+                onBlur={() => setTouchedField('stock')}
+                placeholder="0"
+                className={`flex-1 border rounded px-3 py-2 text-gray-900 placeholder-gray-400 ${inputErrorClass('stock')}`}
+              />
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, stock: '0' }))}
+                className="px-3 py-2 text-sm border border-amber-300 text-amber-800 bg-amber-50 rounded hover:bg-amber-100 flex items-center gap-1.5 shrink-0"
+                title="Set stock to 0 (out of stock)"
+              >
+                <PackageX className="w-4 h-4" />
+                Out of stock
+              </button>
+            </div>
             {showError('stock') && <p className="mt-1 text-sm text-red-600">{errors.stock}</p>}
+            <p className="mt-0.5 text-xs text-gray-500">Set to 0 to mark as out of stock. Customers cannot add to cart when stock is 0.</p>
           </div>
+        </div>
+
+        <div className="p-4 rounded-lg border border-gray-200 bg-amber-50/50 space-y-3">
+          <span className="block text-sm font-medium text-gray-700">Sale</span>
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.isOnSale}
+              onChange={(e) => setForm((f) => ({ ...f, isOnSale: e.target.checked }))}
+              className="mt-1 rounded border-gray-300 text-gray-900 focus:ring-gray-500"
+            />
+            <span className="text-sm text-gray-700">On sale — show discounted price in store and use it in cart/checkout</span>
+          </label>
+          {form.isOnSale && (
+            <div>
+              <label htmlFor="discountedPrice" className="block text-sm font-medium text-gray-700 mb-1">Discounted price (optional)</label>
+              <input
+                id="discountedPrice"
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.discountedPrice}
+                onChange={(e) => setForm((f) => ({ ...f, discountedPrice: e.target.value }))}
+                onBlur={() => setTouchedField('discountedPrice')}
+                placeholder={form.price ? `e.g. less than ${form.price}` : 'Must be less than original price'}
+                className={`w-full max-w-xs border rounded px-3 py-2 text-gray-900 placeholder-gray-400 ${inputErrorClass('discountedPrice')}`}
+              />
+              {showError('discountedPrice') && <p className="mt-1 text-sm text-red-600">{errors.discountedPrice}</p>}
+              <p className="mt-0.5 text-xs text-gray-500">Must be ≥ 0 and less than the original price. Leave empty to clear discount.</p>
+            </div>
+          )}
+        </div>
+
+        <div className="p-4 rounded-lg border border-gray-200 bg-gray-50 space-y-3">
+          <span className="block text-sm font-medium text-gray-700">Store visibility</span>
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.isActive}
+              onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
+              className="mt-1 rounded border-gray-300 text-gray-900 focus:ring-gray-500"
+            />
+            <span className="text-sm text-gray-700">
+              Visible in store — show this game in the store listing. Uncheck to <strong>soft delete</strong> (hide from store; product stays in the system and can be restored).
+            </span>
+          </label>
+          {!form.isActive && (
+            <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2 flex items-center gap-2">
+              <EyeOff className="w-4 h-4 shrink-0" />
+              This game is hidden from the store. Check the box above to make it visible again.
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -62,6 +62,41 @@ export async function deleteProduct(id) {
   });
 }
 
+/** List reviews for a product. Params: page, limit (max 50), sort ('createdAt' | '-createdAt'). */
+export async function getProductReviews(productId, params = {}) {
+  const cleaned = Object.fromEntries(
+    Object.entries(params).filter(([, v]) => v != null && v !== '')
+  );
+  const query = new URLSearchParams(cleaned).toString();
+  const path = query
+    ? `/api/products/${productId}/reviews?${query}`
+    : `/api/products/${productId}/reviews`;
+  const res = await api(path);
+  return unwrap(res);
+}
+
+/** Get the authenticated user's review for this product (or null). */
+export async function getMyReview(productId) {
+  const res = await api(`/api/products/${productId}/reviews/me`);
+  return unwrap(res);
+}
+
+/** Create or update my review. Body: { rating: 1–5, comment?: string (max 2000) }. */
+export async function submitReview(productId, body) {
+  const res = await api(`/api/products/${productId}/reviews`, {
+    method: 'POST',
+    body,
+  });
+  return unwrap(res);
+}
+
+/** Delete my review for this product. */
+export async function deleteReview(productId) {
+  return api(`/api/products/${productId}/reviews`, {
+    method: 'DELETE',
+  });
+}
+
 /** Upload product cover image (S3). multipart/form-data, field "image". */
 export async function uploadProductImage(productId, file) {
   const url = `${BASE_URL}/api/products/${productId}/image`;

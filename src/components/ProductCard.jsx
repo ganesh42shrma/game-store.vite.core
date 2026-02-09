@@ -3,8 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { addCartItem } from '../api/cart.js';
+import { getSellingPrice, isOnSale } from '../utils/productPrice.js';
 
-export default function ProductCard({ product }) {
+export default function ProductCard({ product, variant }) {
   const { user, isAdmin } = useAuth();
   const { getQuantity, refreshCart } = useCart();
   const navigate = useNavigate();
@@ -14,6 +15,8 @@ export default function ProductCard({ product }) {
   const id = product._id;
   const name = product.title || product.name || 'Game';
   const price = product.price != null ? Number(product.price) : 0;
+  const sellingPrice = getSellingPrice(product);
+  const onSale = isOnSale(product);
   const image = product.coverImage || product.image || product.imageUrl;
   const shortDesc = product.shortDescription?.trim() || '';
   const tags = Array.isArray(product.tags) ? product.tags.filter((t) => t != null && String(t).trim()) : [];
@@ -53,8 +56,18 @@ export default function ProductCard({ product }) {
     }
   };
 
+  const isSaleSection = variant === 'sale';
   return (
-    <div className="group border border-gray-200 rounded-lg overflow-hidden hover:shadow-sm transition-shadow bg-white flex flex-col">
+    <div className={`group rounded-lg overflow-hidden transition-shadow flex flex-col relative ${
+      isSaleSection
+        ? 'border-2 border-amber-300 bg-amber-50/70 hover:shadow-md hover:border-amber-400'
+        : 'border border-gray-200 bg-white hover:shadow-sm'
+    }`}>
+      {onSale && (
+        <span className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded text-xs font-semibold bg-amber-500 text-white shadow">
+          Sale
+        </span>
+      )}
       <Link to={`/products/${id}`} className="block flex-1 min-h-0">
         <div className="aspect-square bg-gray-100 flex items-center justify-center overflow-hidden">
           {image ? (
@@ -89,7 +102,16 @@ export default function ProductCard({ product }) {
               )}
             </div>
           )}
-          <p className="text-gray-900 font-medium mt-2">${price.toFixed(2)}</p>
+          <div className="mt-2 flex items-baseline gap-2 flex-wrap">
+            {onSale ? (
+              <>
+                <span className="text-gray-400 line-through text-sm">${price.toFixed(2)}</span>
+                <span className="text-gray-900 font-medium">${sellingPrice.toFixed(2)}</span>
+              </>
+            ) : (
+              <span className="text-gray-900 font-medium">${sellingPrice.toFixed(2)}</span>
+            )}
+          </div>
         </div>
       </Link>
       {user && !isAdmin && (

@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
-import { Link } from 'react-router-dom';
-import { Search, ChevronDown, ChevronUp, X } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { Search, ChevronDown, ChevronUp, X, Tag } from 'lucide-react';
 import { getProducts, getProductTags } from '../api/products.js';
+import { isOnSale } from '../utils/productPrice.js';
 import ProductCard from '../components/ProductCard.jsx';
 import PaginationBar from '../components/PaginationBar.jsx';
 import ProductCardSkeleton from '../components/loaders/ProductCardSkeleton.jsx';
@@ -10,15 +11,21 @@ import { useCart } from '../context/CartContext.jsx';
 import { useDebouncedValue } from '../hooks/useDebouncedValue.js';
 
 const PRODUCTS_PER_PAGE = 12;
+const SALE_FEATURED_LIMIT = 3;
+const SALE_PAGE_LIMIT = 48;
 const SEARCH_DEBOUNCE_MS = 400;
 const FETCH_THROTTLE_MS = 300;
 const PLATFORMS = ['PC', 'PS5', 'XBOX', 'SWITCH'];
 const DEFAULT_TAGS_VISIBLE = 6;
 
 export default function Home() {
+  const location = useLocation();
+  const isSaleOnlyPage = location.pathname === '/home/sale';
   const { user, isAdmin } = useAuth();
   const { refreshCart, totalItems } = useCart();
   const [products, setProducts] = useState([]);
+  const [saleFeatured, setSaleFeatured] = useState([]);
+  const [saleFeaturedLoading, setSaleFeaturedLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
@@ -41,6 +48,31 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    if (isSaleOnlyPage) return;
+    setSaleFeaturedLoading(true);
+    getProducts({ isOnSale: true, limit: SALE_PAGE_LIMIT })
+      .then((data) => {
+        const list = Array.isArray(data) ? data : data?.products ?? data?.data ?? [];
+        const onSale = list.filter((p) => isOnSale(p));
+        setSaleFeatured(onSale.slice(0, SALE_FEATURED_LIMIT));
+      })
+      .catch(() => setSaleFeatured([]))
+      .finally(() => setSaleFeaturedLoading(false));
+  }, [isSaleOnlyPage]);
+
+  useEffect(() => {
+    if (isSaleOnlyPage) {
+      setLoading(true);
+      setError(null);
+      getProducts({ isOnSale: true, limit: SALE_PAGE_LIMIT })
+        .then((data) => {
+          const list = Array.isArray(data) ? data : data?.products ?? data?.data ?? [];
+          setProducts(list.filter((p) => isOnSale(p)));
+        })
+        .catch((err) => setError(err.message || 'Failed to load games'))
+        .finally(() => setLoading(false));
+      return;
+    }
     const searchJustChanged = prevSearchRef.current !== searchQuery;
     const filtersChanged =
       prevFiltersRef.current.platform !== platform ||
@@ -100,7 +132,7 @@ export default function Home() {
     lastFetchTimeRef.current = Date.now();
     doFetch();
     return cleanup;
-  }, [page, searchQuery, platform, selectedTag]);
+  }, [isSaleOnlyPage, page, searchQuery, platform, selectedTag]);
 
   const hasNext = products.length === PRODUCTS_PER_PAGE;
   const showCheckoutBar = user && !isAdmin && totalItems > 0;
@@ -108,8 +140,80 @@ export default function Home() {
   const visibleTags = tagsExpanded ? allTags : allTags.slice(0, DEFAULT_TAGS_VISIBLE);
   const hasMoreTags = allTags.length > DEFAULT_TAGS_VISIBLE;
 
+  if (isSaleOnlyPage) {
+    return (
+      <div className={showCheckoutBar ? 'pb-24' : ''}>
+        <Link to="/home" className="text-gray-600 hover:text-gray-900 text-sm mb-4 inline-block">← Back to all games</Link>
+        <h1 className="text-2xl font-semibold text-gray-900 mb-2 flex items-center gap-2">
+          <Tag className="w-7 h-7 text-amber-500" />
+          All games on sale
+        </h1>
+        <p className="text-gray-600 text-sm mb-6">Games currently on sale. Prices shown are discounted.</p>
+        {error && <p className="text-red-600 py-4">{error}</p>}
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Array.from({ length: 6 }, (_, i) => (
+              <ProductCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : products.length === 0 ? (
+          <p className="text-gray-600 py-8">No games on sale right now. Check back later.</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {products.map((product) => (
+              <ProductCard key={product._id} product={product} variant="sale" />
+            ))}
+          </div>
+        )}
+        {showCheckoutBar && (
+          <div className="fixed bottom-0 left-0 right-0 z-10 border-t border-gray-200 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+            <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
+              <p className="text-gray-600 text-sm">
+                <span className="font-medium text-gray-900">{totalItems}</span> item{totalItems !== 1 ? 's' : ''} in cart
+              </p>
+              <Link to="/checkout" className="shrink-0 px-6 py-3 rounded font-medium bg-gray-900 text-white hover:bg-gray-800 transition-colors">
+                Proceed to checkout
+              </Link>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className={showCheckoutBar ? 'pb-24' : ''}>
+      <section className="mb-10 pb-8 border-b border-amber-200/60">
+        <div className="flex items-center justify-between gap-4 mb-4">
+          <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+            <Tag className="w-5 h-5 text-amber-500" />
+            Games on sale
+          </h2>
+          <Link
+            to="/home/sale"
+            className="text-sm font-medium text-amber-700 hover:text-amber-800 flex items-center gap-1"
+          >
+            See more
+            <span aria-hidden>→</span>
+          </Link>
+        </div>
+        {saleFeaturedLoading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Array.from({ length: 3 }, (_, i) => (
+              <ProductCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : saleFeatured.length === 0 ? (
+          <p className="text-gray-500 text-sm py-4">No games on sale right now.</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {saleFeatured.map((product) => (
+              <ProductCard key={product._id} product={product} variant="sale" />
+            ))}
+          </div>
+        )}
+      </section>
+
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <h1 className="text-2xl font-semibold text-gray-900">Games</h1>
         <div className="relative max-w-xs w-full">

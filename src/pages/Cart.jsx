@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { getCart, clearCart } from '../api/cart.js';
 import CartItem from '../components/CartItem.jsx';
+import { getSellingPrice } from '../utils/productPrice.js';
 import CartSkeleton from '../components/loaders/CartSkeleton.jsx';
 
 export default function Cart() {
@@ -74,9 +75,9 @@ export default function Cart() {
   const items = Array.isArray(cart?.items) ? cart.items : [];
   const total = items.reduce((sum, item) => {
     const product = item.product || item;
-    const price = product.price != null ? Number(product.price) : 0;
+    const sellingPrice = getSellingPrice(product);
     const qty = item.quantity ?? 1;
-    return sum + price * qty;
+    return sum + sellingPrice * qty;
   }, 0);
 
   return (

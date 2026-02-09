@@ -5,6 +5,7 @@ import { useCart } from '../context/CartContext.jsx';
 import { getCart } from '../api/cart.js';
 import { getAddresses } from '../api/addresses.js';
 import { createOrder } from '../api/orders.js';
+import { getSellingPrice } from '../utils/productPrice.js';
 import CheckoutSkeleton from '../components/loaders/CheckoutSkeleton.jsx';
 
 const CURRENCY = '$';
@@ -78,9 +79,9 @@ export default function Checkout() {
   const items = cart?.items ?? [];
   const subTotal = items.reduce((sum, item) => {
     const product = item.product || item;
-    const price = product.price != null ? Number(product.price) : 0;
+    const sellingPrice = getSellingPrice(product);
     const qty = item.quantity ?? 1;
-    return sum + price * qty;
+    return sum + sellingPrice * qty;
   }, 0);
 
   if (items.length === 0) {
@@ -141,12 +142,12 @@ export default function Checkout() {
           {items.map((item) => {
             const product = item.product || item;
             const name = product.name || product.title || 'Game';
-            const price = product.price != null ? Number(product.price) : 0;
+            const sellingPrice = getSellingPrice(product);
             const qty = item.quantity ?? 1;
             return (
               <li key={product._id || item.productId} className="flex justify-between">
                 <span>{name} × {qty}</span>
-                <span>{CURRENCY}{(price * qty).toFixed(2)}</span>
+                <span>{CURRENCY}{(sellingPrice * qty).toFixed(2)}</span>
               </li>
             );
           })}

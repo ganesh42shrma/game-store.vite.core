@@ -290,6 +290,8 @@ Base path: `/api/products`
       "releaseDate": null,
       "youtubeLinks": [],
       "isActive": true,
+      "isOnSale": false,
+      "discountedPrice": null,
       "createdAt": "2026-02-04T12:09:35.058Z",
       "updatedAt": "2026-02-04T13:26:29.900Z"
     }
@@ -297,6 +299,7 @@ Base path: `/api/products`
 }
 ```
 
+- **Sale:** When `isOnSale` is true and `discountedPrice` is set, show the discounted price as the selling price and the original `price` as strikethrough. Cart and checkout use the discounted price in that case.
 - **Descriptions:** Use `shortDescription` on listing/card views; use `description` on the product details page.
 - **Tags:** Array of strings (e.g. `["action", "multiplayer"]`) for filtering and recommendations (e.g. related by tags). Stored normalized (trimmed, lowercase). Max 20 tags, each max 50 characters.
 - **youtubeLinks:** Array of 0–3 YouTube URLs (e.g. `https://www.youtube.com/watch?v=...`, `https://youtu.be/...`).
@@ -343,7 +346,14 @@ Use this when creating or editing a product: call it to get existing tags for au
     "platform": "PS5",
     "genre": "Action",
     "stock": 50,
-    "rating": 0,
+    "rating": 4.2,
+    "reviewCount": 150,
+    "positiveCount": 128,
+    "reviewSummary": {
+      "label": "Very Positive",
+      "percentPositive": 85,
+      "reviewCount": 150
+    },
     "coverImage": null,
     "releaseDate": null,
     "isActive": true,
@@ -352,6 +362,10 @@ Use this when creating or editing a product: call it to get existing tags for au
   }
 }
 ```
+
+- **rating** – Average of all review ratings (1–5), updated when reviews are added/updated/deleted.
+- **reviewCount** / **positiveCount** – Used to compute **reviewSummary**. A review is "positive" if rating ≥ 4.
+- **reviewSummary** – Steam-style summary: **label** (e.g. "Very Positive", "Mixed", "No reviews yet"), **percentPositive** (null if no reviews), **reviewCount**. Labels: Overwhelmingly Positive (95%+), Very Positive (80–94%), Positive (65–79%), Mostly Positive (50–64%), Mixed (40–49%), Mostly Negative (25–39%), Negative (15–24%), Very Negative (5–14%), Overwhelmingly Negative (0–4%). Shown only when there are ≥ 5 reviews; otherwise "No reviews yet" or "Need more reviews".
 
 **Error (404)**
 
@@ -403,6 +417,98 @@ Use this on the product details page to show a "Similar games" or "You might als
 
 ---
 
+### Reviews
+
+Base path: `/api/products/:id/reviews` (replace `:id` with the product ID).
+
+#### List reviews for a product
+
+| Method | Path                        | Auth | Description                    |
+|--------|-----------------------------|------|--------------------------------|
+| GET    | `/api/products/:id/reviews` | No   | Paginated list of reviews with Steam-style summary. |
+
+**Query parameters**
+
+| Param  | Type   | Default     | Description              |
+|--------|--------|-------------|--------------------------|
+| page   | number | 1           | Page number.             |
+| limit  | number | 10          | Items per page (max 50). |
+| sort   | string | `-createdAt`| `createdAt` (oldest first) or `-createdAt` (newest first). |
+
+**Response (200)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "summary": {
+      "label": "Very Positive",
+      "percentPositive": 85,
+      "reviewCount": 150
+    },
+    "reviews": [
+      {
+        "_id": "<reviewId>",
+        "user": { "_id": "<userId>", "name": "John", "profilePicture": null },
+        "product": "<productId>",
+        "rating": 5,
+        "comment": "Great game!",
+        "createdAt": "2026-02-06T10:00:00.000Z",
+        "updatedAt": "2026-02-06T10:00:00.000Z"
+      }
+    ],
+    "meta": { "total": 150, "page": 1, "limit": 10, "totalPages": 15 }
+  }
+}
+```
+
+**Error (404)** – Product not found.
+
+---
+
+#### Create or update my review
+
+| Method | Path                        | Auth | Description                                      |
+|--------|-----------------------------|------|--------------------------------------------------|
+| POST   | `/api/products/:id/reviews` | Yes  | One review per user per product; upserts (create or replace). |
+
+**Request body**
+
+| Field   | Type   | Required | Rules                    |
+|---------|--------|----------|--------------------------|
+| rating  | number | Yes      | Integer 1–5              |
+| comment | string | No       | Max 2000 characters      |
+
+**Response (200)** – The saved review (with populated `user`: name, profilePicture).
+
+**Error (404)** – Product not found.
+
+---
+
+#### Get my review for this product
+
+| Method | Path                             | Auth | Description                    |
+|--------|----------------------------------|------|--------------------------------|
+| GET    | `/api/products/:id/reviews/me`  | Yes  | Returns the authenticated user's review or `null`. |
+
+**Response (200)** – `{ "success": true, "data": <review or null> }`
+
+**Error (404)** – Product not found.
+
+---
+
+#### Delete my review
+
+| Method | Path                        | Auth | Description                    |
+|--------|-----------------------------|------|--------------------------------|
+| DELETE | `/api/products/:id/reviews` | Yes  | Deletes the authenticated user's review for this product. |
+
+**Response (200)** – `{ "success": true, "message": "Review deleted" }`
+
+**Error (404)** – Review not found (user has not reviewed this product).
+
+---
+
 ### Create product
 
 | Method | Path              | Auth | Roles        |
@@ -416,7 +522,9 @@ Use this on the product details page to show a "Similar games" or "You might als
 | title             | string   | Yes      | Non-empty                      |
 | description       | string   | Yes      | Non-empty (full text for details page) |
 | shortDescription  | string   | No       | Max 300 chars; for listing/card preview |
-| price             | number   | Yes      | > 0                            |
+| price             | number   | Yes      | > 0 (actual/original price)              |
+| isOnSale          | boolean  | No       | Default `false`; set `true` to show as on sale |
+| discountedPrice   | number   | No       | Must be &lt; price when set; used as selling price when `isOnSale` is true |
 | platform          | string   | Yes      | `PC` \| `PS5` \| `XBOX` \| `SWITCH` |
 | genre             | string   | Yes      | Non-empty                      |
 | stock             | number   | No       | Int ≥ 0                        |
@@ -456,11 +564,15 @@ Use this on the product details page to show a "Similar games" or "You might als
     "stock": 10,
     "rating": 0,
     "isActive": true,
+    "isOnSale": false,
+    "discountedPrice": null,
     "createdAt": "...",
     "updatedAt": "..."
   }
 }
 ```
+
+**Sale behaviour:** `price` is always the actual/original price. When `isOnSale` is true and `discountedPrice` is set, the API returns both; cart and checkout use `discountedPrice` as the selling price. When updating, set `discountedPrice` to `null` to clear the discount; it must be less than `price` when present.
 
 ---
 
@@ -477,14 +589,17 @@ Use this on the product details page to show a "Similar games" or "You might als
 | title             | string   | Non-empty                                                             |
 | description       | string   | Non-empty                                                             |
 | shortDescription  | string   | Max 300 chars (omit to leave unchanged)                               |
-| price             | number   | > 0                                                                   |
+| price             | number   | > 0 (actual price)                                                    |
+| isOnSale          | boolean  | Set/unset sale flag (e.g. for frontend toggle)                        |
+| discountedPrice  | number   | Must be &lt; price; use `null` to clear. When set with `isOnSale: true`, cart/checkout use this as selling price. |
 | platform          | string   | `PC` \| `PS5` \| `XBOX` \| `SWITCH`                                  |
 | genre             | string   | Non-empty                                                             |
-| stock             | number   | Int ≥ 0                                                               |
+| stock             | number   | Int ≥ 0 (set to 0 for out of stock)                                  |
+| isActive          | boolean  | `false` = hide from store (soft delete); `true` = visible             |
 | youtubeLinks      | string[] | 0–3 YouTube URLs (omit to leave unchanged)                            |
 | tags              | string[] | Max 20 tags, each max 50 chars; stored normalized (omit to leave unchanged) |
 
-**Response (200)** – updated product object (same shape as create; includes `shortDescription`, `tags`, `youtubeLinks`).
+**Response (200)** – updated product object (same shape as create; includes `shortDescription`, `tags`, `youtubeLinks`, `isActive`, `isOnSale`, `discountedPrice`).
 
 **Error (404)** – Product not found.
 
@@ -1298,6 +1413,45 @@ There is no real payment gateway; the frontend simulates “redirect to payment�
 
 ---
 
+## Events (SSE – recent purchases)
+
+Used to power **"Someone from X just purchased Y"** toast notifications on the storefront. When a payment is confirmed, the server pushes a **recent-purchase** event to all connected SSE clients. This is **real-time push to the browser**, not an outgoing webhook.
+
+| Method | Path                           | Auth | Description                    |
+|--------|--------------------------------|------|--------------------------------|
+| GET    | `/api/events/recent-purchases` | No   | Server-Sent Events stream     |
+
+**Behavior**
+
+- Response is a long-lived **text/event-stream**. The server sends an initial batch of the last ~20 recent purchases, then sends a new event whenever a payment is confirmed.
+- Each event is one line: `data: <JSON>\n\n`.
+- No authentication; any visitor can subscribe (payload only includes first name, country, and product titles).
+
+**Event payload (JSON)**
+
+| Field          | Type     | Description                                      |
+|----------------|----------|--------------------------------------------------|
+| buyerName      | string   | Buyer's first name (e.g. "Alex")                 |
+| country        | string   | Billing country (e.g. "India")                  |
+| productTitles  | string[] | Titles of purchased games                        |
+| orderId        | string   | Order `_id`                                      |
+| at             | string   | ISO timestamp when the event was emitted         |
+
+**Example (single event)**
+
+```
+data: {"buyerName":"Alex","country":"India","productTitles":["Elden Ring"],"orderId":"507f1f77bcf86cd799439011","at":"2026-02-06T12:00:00.000Z"}
+
+```
+
+**Frontend usage**
+
+- Open a connection with `EventSource('/api/events/recent-purchases')` (use full API base URL in production).
+- Listen for `message` events; parse `event.data` as JSON and show a toast: e.g. *"Alex from India purchased Elden Ring"*.
+- Reconnect on `error` or `close` if you want to keep the stream alive.
+
+---
+
 ## Invoices
 
 Base path: `/api/invoices` (get by id).  
@@ -1459,6 +1613,10 @@ Returns any invoice by ID.
 | GET | `/api/products/tags` | No | Products |
 | GET | `/api/products/:id` | No | Products |
 | GET | `/api/products/:id/related` | No | Products |
+| GET | `/api/products/:id/reviews` | No | Products (Reviews) |
+| GET | `/api/products/:id/reviews/me` | Yes | Products (Reviews) |
+| POST | `/api/products/:id/reviews` | Yes | Products (Reviews) |
+| DELETE | `/api/products/:id/reviews` | Yes | Products (Reviews) |
 | POST | `/api/products` | Yes (admin/manager) | Products |
 | PATCH | `/api/products/:id` | Yes (admin/manager) | Products |
 | DELETE | `/api/products/:id` | Yes (admin/manager) | Products |
@@ -1488,12 +1646,31 @@ Returns any invoice by ID.
 | POST | `/api/payments` | Yes | Payments |
 | GET | `/api/payments/:id` | Yes | Payments |
 | POST | `/api/payments/:id/confirm` | Yes | Payments |
+| GET | `/api/events/recent-purchases` | No | Events (SSE) |
 | GET | `/api/invoices/:id` | Yes | Invoices |
 | GET | `/api/admin/orders` | Yes (admin) | Admin |
 | PATCH | `/api/admin/orders/:id` | Yes (admin) | Admin |
 | GET | `/api/admin/invoices` | Yes (admin) | Admin |
 | GET | `/api/admin/invoices/:id` | Yes (admin) | Admin |
 | PATCH | `/api/admin/invoices/:id` | Yes (admin) | Admin |
+
+---
+
+## Outgoing webhooks (concept; not implemented)
+
+**What they are:** Your backend **POSTs to external URLs** when certain events happen (e.g. when an order is paid, you send a payload to a subscriber’s endpoint). Subscribers can be Zapier, Slack, a CRM, or your own service. This is different from the **SSE recent-purchases** stream above: SSE pushes to **browsers** for in-app toasts; webhooks push to **external servers** for integrations.
+
+**What you can do with outgoing webhooks (if you add them):**
+
+| Event              | Example use |
+|--------------------|-------------|
+| `order.completed`  | Notify Slack/Discord, send to CRM, trigger fulfillment, log in data warehouse |
+| `payment.captured` | Sync to accounting, update external inventory |
+| `user.registered` | Send to email marketing (Mailchimp, etc.) or analytics |
+| `product.low_stock`| Alert warehouse or procurement system |
+| `review.created`   | Moderation pipeline, sentiment analysis |
+
+**Typical implementation:** A **webhook subscriptions** table (URL, secret, events[], enabled). When an event occurs, for each subscriber you POST the payload (with e.g. `X-Webhook-Signature: HMAC-SHA256`) and retry with backoff on failure. This API does not currently implement webhook delivery; the table above is for reference.
 
 ---
 

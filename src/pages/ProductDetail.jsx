@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getProduct, getRelatedProducts } from '../api/products.js';
 import { addCartItem } from '../api/cart.js';
+import { getSellingPrice, isOnSale } from '../utils/productPrice.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import ProductDetailSkeleton from '../components/loaders/ProductDetailSkeleton.jsx';
 import ProductReviewVideos from '../components/ProductReviewVideos.jsx';
+import ProductReviews from '../components/ProductReviews.jsx';
 import ProductCard from '../components/ProductCard.jsx';
 
 export default function ProductDetail() {
@@ -19,6 +21,12 @@ export default function ProductDetail() {
   const [error, setError] = useState(null);
   const [adding, setAdding] = useState(false);
   const [message, setMessage] = useState(null);
+
+  const refetchProduct = () => {
+    getProduct(id)
+      .then((data) => setProduct(data))
+      .catch(() => {});
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -97,6 +105,8 @@ export default function ProductDetail() {
 
   const name = product.title || product.name || 'Game';
   const price = product.price != null ? Number(product.price) : 0;
+  const sellingPrice = getSellingPrice(product);
+  const onSale = isOnSale(product);
   const description = product.description || '';
   const image = product.coverImage || product.image || product.imageUrl;
   const tags = Array.isArray(product.tags) ? product.tags.filter((t) => t != null && String(t).trim()) : [];
@@ -116,7 +126,17 @@ export default function ProductDetail() {
           <div className="flex flex-col md:flex-row md:items-start gap-6">
             <div className="flex-1 min-w-0">
               <h1 className="text-2xl font-semibold text-gray-900">{name}</h1>
-              <p className="text-xl text-gray-700 mt-2">${price.toFixed(2)}</p>
+              <div className="flex items-baseline gap-3 mt-2 flex-wrap">
+                {onSale ? (
+                  <>
+                    <span className="text-gray-400 line-through text-lg">${price.toFixed(2)}</span>
+                    <span className="text-xl font-semibold text-gray-900">${sellingPrice.toFixed(2)}</span>
+                    <span className="px-2 py-0.5 rounded text-sm font-medium bg-amber-100 text-amber-800">Sale</span>
+                  </>
+                ) : (
+                  <span className="text-xl text-gray-700">${sellingPrice.toFixed(2)}</span>
+                )}
+              </div>
               {description && (
                 <p className="text-gray-600 mt-4">{description}</p>
               )}
@@ -166,6 +186,13 @@ export default function ProductDetail() {
           </div>
         </div>
         <ProductReviewVideos links={product.youtubeLinks} />
+        <ProductReviews
+          productId={product._id}
+          product={product}
+          user={user}
+          isAdmin={isAdmin}
+          onReviewChange={refetchProduct}
+        />
       </div>
 
       {related.length > 0 && (

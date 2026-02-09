@@ -3,6 +3,7 @@ import { ShoppingCart, Package } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import UserMenu from './UserMenu.jsx';
+import RecentPurchasesToasts from './RecentPurchasesToasts.jsx';
 
 const iconClass = 'w-5 h-5 text-gray-900';
 
@@ -18,6 +19,7 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
+      <RecentPurchasesToasts />
       {!isLandingOrRegister && (
         <header className="border-b border-gray-200">
           <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">

@@ -33,6 +33,7 @@ const router = createBrowserRouter([
       { index: true, element: <Landing /> },
       { path: 'login', element: <Navigate to="/" replace /> },
       { path: 'home', element: <Home /> },
+      { path: 'home/sale', element: <Home /> },
       { path: 'products/:id', element: <ProductDetail /> },
       { path: 'register', element: <Register /> },
       {

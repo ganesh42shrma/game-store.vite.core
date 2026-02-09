@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Pencil, Trash2 } from 'lucide-react';
 import { getProducts, deleteProduct } from '../../api/products.js';
+import { getSellingPrice, isOnSale } from '../../utils/productPrice.js';
 import PaginationBar from '../../components/PaginationBar.jsx';
 import TableSkeleton from '../../components/loaders/TableSkeleton.jsx';
 
@@ -85,10 +86,24 @@ export default function AdminProducts() {
                 </td>
               </tr>
             ) : (
-              products.map((p) => (
+              products.map((p) => {
+                const onSale = isOnSale(p);
+                const sellingPrice = getSellingPrice(p);
+                const price = Number(p.price ?? 0);
+                return (
                 <tr key={p._id} className="border-b border-gray-100 last:border-0">
                   <td className="px-4 py-3 text-gray-900">{p.title || p.name || '—'}</td>
-                  <td className="px-4 py-3 text-gray-600">${Number(p.price ?? 0).toFixed(2)}</td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {onSale ? (
+                      <span className="flex items-center gap-1.5">
+                        <span className="line-through text-gray-400">${price.toFixed(2)}</span>
+                        <span>${sellingPrice.toFixed(2)}</span>
+                        <span className="px-1.5 py-0.5 rounded text-xs bg-amber-100 text-amber-800">Sale</span>
+                      </span>
+                    ) : (
+                      `$${sellingPrice.toFixed(2)}`
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <Link
@@ -110,7 +125,8 @@ export default function AdminProducts() {
                     </div>
                   </td>
                 </tr>
-              ))
+              );
+              })
             )}
           </tbody>
         </table>

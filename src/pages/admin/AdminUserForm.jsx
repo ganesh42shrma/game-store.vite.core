@@ -13,7 +13,8 @@ const emptyForm = { name: '', email: '', password: '', role: 'user', isActive: t
 export default function AdminUserForm() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const isNew = id === 'new';
+  // When route is /admin/users/new there is no :id param, so id can be undefined
+  const isNew = id == null || id === 'new';
   const [user, setUser] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(!isNew);
