@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { getProduct, createProduct, updateProduct, uploadProductImage } from '../../api/products.js';
+import { getProduct, createProduct, updateProduct, uploadProductImage, getProductTags } from '../../api/products.js';
 import FormSkeleton from '../../components/loaders/FormSkeleton.jsx';
 import { Upload, X, Image as ImageIcon, Plus } from 'lucide-react';
 
 const MAX_YOUTUBE_LINKS = 3;
+const MAX_TAGS = 20;
+const MAX_TAG_LENGTH = 50;
+const MAX_SHORT_DESC = 300;
 
 const PLATFORMS = ['PC', 'PS5', 'XBOX', 'SWITCH'];
 const ACCEPT_IMAGE = 'image/jpeg,image/png,image/gif,image/webp';
@@ -45,6 +48,12 @@ function validateStock(value) {
   return null;
 }
 
+function validateShortDescription(value) {
+  if (!value || !value.trim()) return null;
+  if (value.length > MAX_SHORT_DESC) return `Max ${MAX_SHORT_DESC} characters`;
+  return null;
+}
+
 function validateImageFile(file) {
   if (!file) return null;
   const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
@@ -68,16 +77,21 @@ export default function AdminProductForm() {
   const [form, setForm] = useState({
     title: '',
     description: '',
+    shortDescription: '',
     price: '',
     platform: 'PC',
     genre: '',
     stock: '0',
     youtubeLinks: [],
+    tags: [],
   });
+  const [tagInput, setTagInput] = useState('');
+  const [existingTags, setExistingTags] = useState([]);
 
   const errors = {
     title: validateTitle(form.title),
     description: validateDescription(form.description),
+    shortDescription: validateShortDescription(form.shortDescription),
     price: validatePrice(form.price),
     genre: validateGenre(form.genre),
     stock: validateStock(form.stock),
@@ -89,17 +103,23 @@ export default function AdminProductForm() {
   }, []);
 
   useEffect(() => {
+    getProductTags().then(setExistingTags).catch(() => {});
+  }, []);
+
+  useEffect(() => {
     if (!isEdit) return;
     getProduct(id)
       .then((data) => {
         setForm({
           title: data.title ?? '',
           description: data.description ?? '',
+          shortDescription: data.shortDescription ?? '',
           price: data.price != null ? String(data.price) : '',
           platform: data.platform ?? 'PC',
           genre: data.genre ?? '',
           stock: data.stock != null ? String(data.stock) : '0',
           youtubeLinks: Array.isArray(data.youtubeLinks) ? [...data.youtubeLinks] : [],
+          tags: Array.isArray(data.tags) ? data.tags.map((t) => String(t).trim()).filter(Boolean) : [],
         });
         if (data.coverImage) setExistingCoverUrl(data.coverImage);
       })
@@ -141,9 +161,25 @@ export default function AdminProductForm() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const addTag = (raw) => {
+    const t = String(raw).trim().toLowerCase().slice(0, MAX_TAG_LENGTH);
+    if (!t) return;
+    const current = form.tags ?? [];
+    if (current.includes(t) || current.length >= MAX_TAGS) return;
+    setForm((f) => ({ ...f, tags: [...current, t] }));
+    setTagInput('');
+  };
+
+  const removeTag = (index) => {
+    setForm((f) => ({
+      ...f,
+      tags: (f.tags ?? []).filter((_, i) => i !== index),
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setTouched({ title: true, description: true, price: true, genre: true, stock: true });
+    setTouched({ title: true, description: true, shortDescription: true, price: true, genre: true, stock: true });
     const hasErrors = Object.values(errors).some(Boolean);
     if (hasErrors) {
       setError('Please fix the errors below.');
@@ -155,14 +191,17 @@ export default function AdminProductForm() {
       .map((u) => (typeof u === 'string' ? u.trim() : ''))
       .filter(Boolean)
       .slice(0, MAX_YOUTUBE_LINKS);
+    const tags = (form.tags ?? []).map((t) => String(t).trim().toLowerCase().slice(0, MAX_TAG_LENGTH)).filter(Boolean).slice(0, MAX_TAGS);
     const payload = {
       title: form.title.trim(),
       description: form.description.trim(),
+      shortDescription: form.shortDescription?.trim() || undefined,
       price: parseFloat(form.price),
       platform: form.platform,
       genre: form.genre.trim(),
       stock: Math.max(0, parseInt(form.stock, 10) || 0),
       youtubeLinks,
+      tags,
     };
     try {
       let productId = id;
@@ -231,6 +270,86 @@ export default function AdminProductForm() {
             className={`w-full border rounded px-3 py-2 text-gray-900 placeholder-gray-400 ${inputErrorClass('description')}`}
           />
           {showError('description') && <p className="mt-1 text-sm text-red-600">{errors.description}</p>}
+        </div>
+
+        <div>
+          <label htmlFor="shortDescription" className="block text-sm font-medium text-gray-700 mb-1">Short description (for listings, optional, max {MAX_SHORT_DESC} chars)</label>
+          <textarea
+            id="shortDescription"
+            rows={2}
+            value={form.shortDescription}
+            onChange={(e) => setForm((f) => ({ ...f, shortDescription: e.target.value }))}
+            onBlur={() => setTouchedField('shortDescription')}
+            placeholder="Brief preview shown on product cards"
+            maxLength={MAX_SHORT_DESC}
+            className={`w-full border rounded px-3 py-2 text-gray-900 placeholder-gray-400 ${inputErrorClass('shortDescription')}`}
+          />
+          {showError('shortDescription') && <p className="mt-1 text-sm text-red-600">{errors.shortDescription}</p>}
+          <p className="mt-0.5 text-xs text-gray-500">{form.shortDescription.length}/{MAX_SHORT_DESC}</p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Tags (optional, max {MAX_TAGS}, for recommendations)</label>
+          <div className="flex flex-wrap gap-2 mb-2">
+            {(form.tags ?? []).map((tag, index) => (
+              <span
+                key={`${tag}-${index}`}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-sm bg-gray-100 text-gray-800"
+              >
+                {tag}
+                <button
+                  type="button"
+                  onClick={() => removeTag(index)}
+                  className="p-0.5 rounded hover:bg-gray-200 text-gray-500 hover:text-red-600"
+                  aria-label={`Remove ${tag}`}
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </span>
+            ))}
+          </div>
+          <div className="flex gap-2 flex-wrap items-center">
+            <input
+              type="text"
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addTag(tagInput);
+                }
+              }}
+              placeholder="Type a tag and press Enter or Add"
+              maxLength={MAX_TAG_LENGTH}
+              className="flex-1 min-w-[160px] border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 placeholder-gray-400"
+            />
+            <button
+              type="button"
+              onClick={() => addTag(tagInput)}
+              disabled={(form.tags ?? []).length >= MAX_TAGS}
+              className="px-3 py-2 text-sm border border-gray-300 rounded text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              Add
+            </button>
+          </div>
+          {existingTags.length > 0 && (
+            <p className="mt-1.5 text-xs text-gray-500">
+              Suggestions:{' '}
+              {existingTags
+                .filter((t) => !(form.tags ?? []).includes(t))
+                .slice(0, 12)
+                .map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => addTag(t)}
+                    className="mr-1.5 underline hover:no-underline"
+                  >
+                    {t}
+                  </button>
+                ))}
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

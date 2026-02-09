@@ -14,9 +14,30 @@ export async function getProducts(params = {}) {
   return unwrap(res);
 }
 
+/** All distinct tags across products (for admin autocomplete). */
+export async function getProductTags() {
+  const res = await api('/api/products/tags');
+  const data = unwrap(res);
+  return Array.isArray(data) ? data : [];
+}
+
 export async function getProduct(id) {
   const res = await api(`/api/products/${id}`);
   return unwrap(res);
+}
+
+/** Related products (similar games by tags). Optional params: { limit } (1–20, default 6). */
+export async function getRelatedProducts(productId, params = {}) {
+  const cleaned = Object.fromEntries(
+    Object.entries(params).filter(([, v]) => v != null && v !== '')
+  );
+  const query = new URLSearchParams(cleaned).toString();
+  const path = query
+    ? `/api/products/${productId}/related?${query}`
+    : `/api/products/${productId}/related`;
+  const res = await api(path);
+  const data = unwrap(res);
+  return Array.isArray(data) ? data : [];
 }
 
 export async function createProduct(body) {

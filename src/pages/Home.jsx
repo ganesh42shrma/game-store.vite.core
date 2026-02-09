@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Search } from 'lucide-react';
-import { getProducts } from '../api/products.js';
+import { Search, ChevronDown, ChevronUp, X } from 'lucide-react';
+import { getProducts, getProductTags } from '../api/products.js';
 import ProductCard from '../components/ProductCard.jsx';
 import PaginationBar from '../components/PaginationBar.jsx';
 import ProductCardSkeleton from '../components/loaders/ProductCardSkeleton.jsx';
@@ -12,6 +12,8 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue.js';
 const PRODUCTS_PER_PAGE = 12;
 const SEARCH_DEBOUNCE_MS = 400;
 const FETCH_THROTTLE_MS = 300;
+const PLATFORMS = ['PC', 'PS5', 'XBOX', 'SWITCH'];
+const DEFAULT_TAGS_VISIBLE = 6;
 
 export default function Home() {
   const { user, isAdmin } = useAuth();
@@ -21,33 +23,52 @@ export default function Home() {
   const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState('');
+  const [platform, setPlatform] = useState('');
+  const [selectedTag, setSelectedTag] = useState('');
+  const [allTags, setAllTags] = useState([]);
+  const [tagsExpanded, setTagsExpanded] = useState(false);
   const searchQuery = useDebouncedValue(searchInput.trim(), SEARCH_DEBOUNCE_MS);
   const lastFetchTimeRef = useRef(0);
   const prevSearchRef = useRef(searchQuery);
+  const prevFiltersRef = useRef({ platform, selectedTag });
 
   useEffect(() => {
     if (user) refreshCart();
   }, [user, refreshCart]);
 
   useEffect(() => {
+    getProductTags().then(setAllTags).catch(() => {});
+  }, []);
+
+  useEffect(() => {
     const searchJustChanged = prevSearchRef.current !== searchQuery;
+    const filtersChanged =
+      prevFiltersRef.current.platform !== platform ||
+      prevFiltersRef.current.selectedTag !== selectedTag;
     if (searchJustChanged) {
       prevSearchRef.current = searchQuery;
+    }
+    if (filtersChanged) {
+      prevFiltersRef.current = { platform, selectedTag };
       setPage(1);
     }
-    const pageToFetch = searchJustChanged ? 1 : page;
+    const pageToFetch = searchJustChanged || filtersChanged ? 1 : page;
 
     let cancelled = false;
     const cleanup = () => { cancelled = true; };
 
+    const params = {
+      page: pageToFetch,
+      limit: PRODUCTS_PER_PAGE,
+      search: searchQuery || undefined,
+      platform: platform || undefined,
+      tag: selectedTag || undefined,
+    };
+
     const doFetch = () => {
       setLoading(true);
       setError(null);
-      getProducts({
-        page: pageToFetch,
-        limit: PRODUCTS_PER_PAGE,
-        search: searchQuery || undefined,
-      })
+      getProducts(params)
         .then((data) => {
           if (cancelled) return;
           const list = Array.isArray(data) ? data : data?.products ?? data?.data ?? [];
@@ -79,10 +100,13 @@ export default function Home() {
     lastFetchTimeRef.current = Date.now();
     doFetch();
     return cleanup;
-  }, [page, searchQuery]);
+  }, [page, searchQuery, platform, selectedTag]);
 
   const hasNext = products.length === PRODUCTS_PER_PAGE;
   const showCheckoutBar = user && !isAdmin && totalItems > 0;
+  const hasActiveFilters = platform || selectedTag;
+  const visibleTags = tagsExpanded ? allTags : allTags.slice(0, DEFAULT_TAGS_VISIBLE);
+  const hasMoreTags = allTags.length > DEFAULT_TAGS_VISIBLE;
 
   return (
     <div className={showCheckoutBar ? 'pb-24' : ''}>
@@ -100,6 +124,83 @@ export default function Home() {
           />
         </div>
       </div>
+
+      <div className="mb-6 space-y-4">
+        <div>
+          <p className="text-sm font-medium text-gray-700 mb-2">Platform</p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setPlatform('')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                !platform
+                  ? 'bg-gray-900 text-white border-gray-900'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              All
+            </button>
+            {PLATFORMS.map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setPlatform(p)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                  platform === p
+                    ? 'bg-gray-900 text-white border-gray-900'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <p className="text-sm font-medium text-gray-700 mb-2">Tags</p>
+          <div className="flex flex-wrap gap-2 items-center">
+            {visibleTags.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => setSelectedTag(selectedTag === tag ? '' : tag)}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                  selectedTag === tag
+                    ? 'bg-gray-900 text-white border-gray-900'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
+                }`}
+              >
+                {tag}
+              </button>
+            ))}
+            {hasMoreTags && (
+              <button
+                type="button"
+                onClick={() => setTagsExpanded((e) => !e)}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium text-gray-600 border border-gray-300 bg-white hover:bg-gray-50"
+              >
+                {tagsExpanded ? (
+                  <>Less <ChevronUp className="w-4 h-4" /></>
+                ) : (
+                  <>More <ChevronDown className="w-4 h-4" /></>
+                )}
+              </button>
+            )}
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={() => { setPlatform(''); setSelectedTag(''); }}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium text-red-600 border border-red-200 bg-red-50 hover:bg-red-100"
+              >
+                <X className="w-4 h-4" />
+                Clear filters
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
       {error && (
         <p className="text-red-600 py-4 text-center">{error}</p>
       )}

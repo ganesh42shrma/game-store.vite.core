@@ -15,6 +15,8 @@ export default function ProductCard({ product }) {
   const name = product.title || product.name || 'Game';
   const price = product.price != null ? Number(product.price) : 0;
   const image = product.coverImage || product.image || product.imageUrl;
+  const shortDesc = product.shortDescription?.trim() || '';
+  const tags = Array.isArray(product.tags) ? product.tags.filter((t) => t != null && String(t).trim()) : [];
   const inCartQty = user ? getQuantity(id) : 0;
 
   const handleAddToCart = async (e) => {
@@ -67,7 +69,27 @@ export default function ProductCard({ product }) {
         </div>
         <div className="p-4">
           <h2 className="font-medium text-gray-900 truncate">{name}</h2>
-          <p className="text-gray-600 mt-1">${price.toFixed(2)}</p>
+          {shortDesc && (
+            <p className="text-gray-600 text-sm mt-1 line-clamp-2">{shortDesc}</p>
+          )}
+          {tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {tags.slice(0, 5).map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700"
+                >
+                  {String(tag).trim()}
+                </span>
+              ))}
+              {tags.length > 5 && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs text-gray-500">
+                  +{tags.length - 5}
+                </span>
+              )}
+            </div>
+          )}
+          <p className="text-gray-900 font-medium mt-2">${price.toFixed(2)}</p>
         </div>
       </Link>
       {user && !isAdmin && (
