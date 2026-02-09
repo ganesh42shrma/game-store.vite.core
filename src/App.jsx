@@ -24,6 +24,7 @@ import AdminInvoices from './pages/admin/AdminInvoices.jsx';
 import AdminInvoiceDetail from './pages/admin/AdminInvoiceDetail.jsx';
 import AdminUsers from './pages/admin/AdminUsers.jsx';
 import AdminUserForm from './pages/admin/AdminUserForm.jsx';
+import AdminAnalytics from './pages/admin/AdminAnalytics.jsx';
 
 const router = createBrowserRouter([
   {
@@ -125,6 +126,7 @@ const router = createBrowserRouter([
         ),
         children: [
           { index: true, element: <Navigate to="/admin/products" replace /> },
+          { path: 'analytics', element: <AdminAnalytics /> },
           { path: 'products', element: <AdminProducts /> },
           { path: 'products/new', element: <AdminProductForm /> },
           { path: 'products/:id/edit', element: <AdminProductForm /> },
