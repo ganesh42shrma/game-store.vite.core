@@ -13,6 +13,7 @@ import Orders from './pages/Orders.jsx';
 import OrderDetail from './pages/OrderDetail.jsx';
 import OrderSuccess from './pages/OrderSuccess.jsx';
 import Profile from './pages/Profile.jsx';
+import MyAlerts from './pages/MyAlerts.jsx';
 import Addresses from './pages/Addresses.jsx';
 import CheckoutPay from './pages/CheckoutPay.jsx';
 import InvoiceView from './pages/InvoiceView.jsx';
@@ -25,6 +26,7 @@ import AdminInvoiceDetail from './pages/admin/AdminInvoiceDetail.jsx';
 import AdminUsers from './pages/admin/AdminUsers.jsx';
 import AdminUserForm from './pages/admin/AdminUserForm.jsx';
 import AdminAnalytics from './pages/admin/AdminAnalytics.jsx';
+import AdminLLMAnalytics from './pages/admin/AdminLLMAnalytics.jsx';
 
 const router = createBrowserRouter([
   {
@@ -118,6 +120,14 @@ const router = createBrowserRouter([
         ),
       },
       {
+        path: 'profile/alerts',
+        element: (
+          <ProtectedRoute>
+            <MyAlerts />
+          </ProtectedRoute>
+        ),
+      },
+      {
         path: 'admin',
         element: (
           <AdminRoute>
@@ -127,6 +137,7 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <Navigate to="/admin/products" replace /> },
           { path: 'analytics', element: <AdminAnalytics /> },
+          { path: 'llm-analytics', element: <AdminLLMAnalytics /> },
           { path: 'products', element: <AdminProducts /> },
           { path: 'products/new', element: <AdminProductForm /> },
           { path: 'products/:id/edit', element: <AdminProductForm /> },

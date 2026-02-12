@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getOrder, updateAdminOrderStatus } from '../../api/orders.js';
+import { getAdminOrder, updateAdminOrderStatus } from '../../api/orders.js';
 import OrderDetailSkeleton from '../../components/loaders/OrderDetailSkeleton.jsx';
 
 const CURRENCY = '$';
@@ -19,7 +19,7 @@ export default function AdminOrderDetail() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    getOrder(id)
+    getAdminOrder(id)
       .then((data) => {
         setOrder(data);
         setStatus(data?.status ?? '');

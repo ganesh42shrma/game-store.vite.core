@@ -1,10 +1,11 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Package, ShoppingBag, FileText, Users, LayoutDashboard, BarChart3 } from 'lucide-react';
+import { Package, ShoppingBag, FileText, Users, LayoutDashboard, BarChart3, Bot } from 'lucide-react';
 
 const iconClass = 'w-5 h-5 shrink-0';
 
 const navItems = [
   { to: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
+  { to: '/admin/llm-analytics', label: 'LLM Analytics', icon: Bot },
   { to: '/admin/products', label: 'Products', icon: Package },
   { to: '/admin/orders', label: 'Orders', icon: ShoppingBag },
   { to: '/admin/invoices', label: 'Invoices', icon: FileText },

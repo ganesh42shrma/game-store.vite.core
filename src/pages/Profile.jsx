@@ -96,9 +96,12 @@ export default function Profile() {
   return (
     <div className="max-w-md">
       <h1 className="text-2xl font-semibold text-gray-900 mb-6">Profile</h1>
-      <p className="mb-4 text-sm text-gray-600">
+      <p className="mb-4 text-sm text-gray-600 space-x-4">
         <Link to="/profile/addresses" className="text-gray-900 underline hover:no-underline">
           Manage addresses
+        </Link>
+        <Link to="/profile/alerts" className="text-gray-900 underline hover:no-underline">
+          My alerts
         </Link>
       </p>
 

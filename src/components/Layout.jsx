@@ -3,7 +3,10 @@ import { ShoppingCart, Package } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import UserMenu from './UserMenu.jsx';
+import NotificationBell from './NotificationBell.jsx';
 import RecentPurchasesToasts from './RecentPurchasesToasts.jsx';
+import ProductAlertToasts from './ProductAlertToasts.jsx';
+import GameQAChat from './GameQAChat.jsx';
 
 const iconClass = 'w-5 h-5 text-gray-900';
 
@@ -20,6 +23,7 @@ export default function Layout() {
   return (
     <div className="min-h-screen bg-white flex flex-col">
       <RecentPurchasesToasts />
+      <ProductAlertToasts />
       {!isLandingOrRegister && (
         <header className="border-b border-gray-200">
           <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -55,6 +59,7 @@ export default function Layout() {
                         <Package className={iconClass} />
                         <span className="sr-only md:not-sr-only md:inline">Orders</span>
                       </Link>
+                      <NotificationBell />
                     </>
                   )}
                   {isAdmin && (
@@ -81,6 +86,7 @@ export default function Layout() {
       <main className={isLandingOrRegister ? 'flex-1 w-full p-0 min-h-0 flex' : 'flex-1 max-w-6xl w-full mx-auto px-4 py-8'}>
         <Outlet />
       </main>
+      {user && !isLandingOrRegister && <GameQAChat />}
       {user && (
         <footer className="mt-auto border-t border-gray-200 bg-white">
           <div className="max-w-6xl mx-auto px-4 py-8">
@@ -92,8 +98,9 @@ export default function Layout() {
                 <Link to="/home" className="hover:text-gray-900">Home</Link>
                 {!isAdmin && (
                   <>
-                    <Link to="/cart" className="hover:text-gray-900">Cart</Link>
-                    <Link to="/orders" className="hover:text-gray-900">Orders</Link>
+                <Link to="/cart" className="hover:text-gray-900">Cart</Link>
+                <Link to="/orders" className="hover:text-gray-900">Orders</Link>
+                <Link to="/profile/alerts" className="hover:text-gray-900">My alerts</Link>
                   </>
                 )}
                 <Link to="/profile" className="hover:text-gray-900">Profile</Link>

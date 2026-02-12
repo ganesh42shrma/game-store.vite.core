@@ -80,71 +80,73 @@ export default function AdminInvoices() {
         </button>
       </div>
 
-      <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-        <table className="w-full text-left">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-4 py-3 text-sm font-medium text-gray-700">Invoice</th>
-              <th className="px-4 py-3 text-sm font-medium text-gray-700">Order</th>
-              <th className="px-4 py-3 text-sm font-medium text-gray-700">User</th>
-              <th className="px-4 py-3 text-sm font-medium text-gray-700">Total</th>
-              <th className="px-4 py-3 text-sm font-medium text-gray-700">Status</th>
-              <th className="px-4 py-3 text-sm font-medium text-gray-700">Issued</th>
-              <th className="px-4 py-3 text-sm font-medium text-gray-700">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {invoices.length === 0 ? (
+      <div className="border border-gray-200 rounded-lg bg-white min-w-0">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left min-w-[700px]">
+            <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-gray-500 text-center">
-                  No invoices found.
-                </td>
+                <th className="px-4 py-3 text-sm font-medium text-gray-700">Invoice</th>
+                <th className="px-4 py-3 text-sm font-medium text-gray-700">Order</th>
+                <th className="px-4 py-3 text-sm font-medium text-gray-700">User</th>
+                <th className="px-4 py-3 text-sm font-medium text-gray-700">Total</th>
+                <th className="px-4 py-3 text-sm font-medium text-gray-700">Status</th>
+                <th className="px-4 py-3 text-sm font-medium text-gray-700">Issued</th>
+                <th className="px-4 py-3 text-sm font-medium text-gray-700 whitespace-nowrap pl-4 pr-4">Actions</th>
               </tr>
-            ) : (
-              invoices.map((inv) => {
-                const orderId = typeof inv.order === 'object' ? inv.order?._id : inv.order;
-                const userObj = typeof inv.user === 'object' ? inv.user : null;
-                const userLabel = userObj ? (userObj.email || userObj.name || inv.user) : (inv.user ?? '—');
-                const total = inv.totalAmount != null ? Number(inv.totalAmount) : 0;
-                const issuedAt = inv.issuedAt ? new Date(inv.issuedAt).toLocaleDateString() : '—';
-                return (
-                  <tr key={inv._id} className="border-b border-gray-100 last:border-0">
-                    <td className="px-4 py-3 font-medium text-gray-900">
-                      {inv.invoiceNumber ?? inv._id?.slice(-8)}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">
-                      {orderId ? (
-                        <Link to={`/admin/orders/${orderId}`} className="text-gray-900 hover:underline">
-                          {orderId.slice(-8)}
+            </thead>
+            <tbody>
+              {invoices.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-gray-500 text-center">
+                    No invoices found.
+                  </td>
+                </tr>
+              ) : (
+                invoices.map((inv) => {
+                  const orderId = typeof inv.order === 'object' ? inv.order?._id : inv.order;
+                  const userObj = typeof inv.user === 'object' ? inv.user : null;
+                  const userLabel = userObj ? (userObj.email || userObj.name || inv.user) : (inv.user ?? '—');
+                  const total = inv.totalAmount != null ? Number(inv.totalAmount) : 0;
+                  const issuedAt = inv.issuedAt ? new Date(inv.issuedAt).toLocaleDateString() : '—';
+                  return (
+                    <tr key={inv._id} className="border-b border-gray-100 last:border-0">
+                      <td className="px-4 py-3 font-medium text-gray-900">
+                        {inv.invoiceNumber ?? inv._id?.slice(-8)}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">
+                        {orderId ? (
+                          <Link to={`/admin/orders/${orderId}`} className="text-gray-900 hover:underline">
+                            {orderId.slice(-8)}
+                          </Link>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600 max-w-[200px] truncate" title={userLabel}>{userLabel}</td>
+                      <td className="px-4 py-3 text-gray-600">${total.toFixed(2)}</td>
+                      <td className="px-4 py-3">
+                        <span className={`px-1.5 py-0.5 rounded text-xs ${
+                          inv.status === 'issued' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'
+                        }`}>
+                          {inv.status ?? '—'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">{issuedAt}</td>
+                      <td className="px-4 py-3 whitespace-nowrap pl-4 pr-4">
+                        <Link
+                          to={`/admin/invoices/${inv._id}`}
+                          className="inline-block px-3 py-1.5 text-sm font-medium rounded border border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
+                        >
+                          View invoice
                         </Link>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">{userLabel}</td>
-                    <td className="px-4 py-3 text-gray-600">${total.toFixed(2)}</td>
-                    <td className="px-4 py-3">
-                      <span className={`px-1.5 py-0.5 rounded text-xs ${
-                        inv.status === 'issued' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'
-                      }`}>
-                        {inv.status ?? '—'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">{issuedAt}</td>
-                    <td className="px-4 py-3">
-                      <Link
-                        to={`/admin/invoices/${inv._id}`}
-                        className="text-gray-600 hover:text-gray-900 text-sm"
-                      >
-                        View
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {meta && meta.totalPages > 1 && (

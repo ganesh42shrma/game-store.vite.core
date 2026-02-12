@@ -9,6 +9,7 @@ import ProductDetailSkeleton from '../components/loaders/ProductDetailSkeleton.j
 import ProductReviewVideos from '../components/ProductReviewVideos.jsx';
 import ProductReviews from '../components/ProductReviews.jsx';
 import ProductCard from '../components/ProductCard.jsx';
+import ProductAlerts from '../components/ProductAlerts.jsx';
 
 export default function ProductDetail() {
   const { id } = useParams();
@@ -169,6 +170,7 @@ export default function ProductDetail() {
                     {message}
                   </p>
                 )}
+                <ProductAlerts product={product} user={user} isAdmin={isAdmin} />
               </div>
             </div>
             {tags.length > 0 && (

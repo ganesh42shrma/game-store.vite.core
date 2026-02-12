@@ -39,6 +39,12 @@ export async function getAdminOrders(params = {}) {
   return { data, meta };
 }
 
+/** Admin: get single order by ID (GET /api/admin/orders/:id). Use this in admin dashboard, not getOrder. */
+export async function getAdminOrder(id) {
+  const res = await api(`/api/admin/orders/${id}`);
+  return res?.data ?? res;
+}
+
 /** Admin: override order status (pending | completed | cancelled). */
 export async function updateAdminOrderStatus(id, body) {
   const res = await api(`/api/admin/orders/${id}`, {
