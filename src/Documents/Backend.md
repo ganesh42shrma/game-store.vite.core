@@ -1691,14 +1691,15 @@ Sends the user’s message to the games Q&A agent. The agent can list products, 
 
 **Request body**
 
-| Field     | Type   | Required | Rules                                      |
-|-----------|--------|----------|--------------------------------------------|
-| message   | string | Yes      | Non-empty; max 2000 characters             |
-| thread_id | string | No       | Conversation thread id; when omitted and user is logged in, server uses `{user_id}-chat` for short-term session. Send the same value to keep a coherent thread. |
+| Field       | Type    | Required | Rules                                      |
+|-------------|---------|----------|--------------------------------------------|
+| message     | string  | Yes      | Non-empty; max 2000 characters             |
+| thread_id   | string  | No       | Conversation thread id; when omitted and user is logged in, server uses `{user_id}-chat`. Send the same value to keep a coherent thread. |
+| new_chat    | boolean | No       | When `true`, starts a fresh conversation: no history is loaded, a new thread id is created and returned. Use for "New chat" / "Clear context". |
 
 When the user is **authenticated**, the agent has **long-term memory** per user: it can remember preferences (e.g. budget, favorite genre, platform) via tools and use them to personalize answers. The agent can also **create product alerts** when the user says e.g. “Notify me when Elden Ring is on sale”, “Tell me when this game drops below ₹2000”, or “Tell me when it’s available”; use **GET /api/alerts** to list and **DELETE /api/alerts/:id** to remove. The agent can **add to cart** ("Add X to cart") and **buy** ("Buy X" or "Purchase X"): it confirms once before executing, asks which address (from **GET /api/addresses**) and payment method (Card, UPI, or Net Banking), and asks whether to buy only that game or checkout the entire cart. If the user has no addresses, the agent tells them to add one first. The server injects the current user id for memory; the client may send **thread_id** to align with a specific conversation thread.
 
-**Chat history** is persisted per user and thread. Each message (user and assistant) is saved to the database. The agent receives the last 20 messages of the thread as context. Use **GET /api/chat/history** to load previous messages when the user opens a chat; use **GET /api/chat/threads** to list a user's conversation threads.
+**Chat history** is persisted per user and thread. Each message (user and assistant) is saved to the database. The agent receives the last 10 messages of the thread as context (configurable via `AGENT_HISTORY_LIMIT`). Long messages are truncated to save tokens. Use **GET /api/chat/history** to load previous messages when the user opens a chat; use **GET /api/chat/threads** to list a user's conversation threads. To start a fresh conversation (clear context), send `new_chat: true` in the request body; the server returns a new `thread_id` to use for follow-up messages. Each user is limited to 3 threads; starting a new one when at the limit deletes the oldest thread.
 
 **Example**
 
@@ -1714,6 +1715,15 @@ With optional thread (e.g. for resuming a session):
 {
   "message": "Recommend something under $50",
   "thread_id": "user123-chat"
+}
+```
+
+To start a fresh conversation (clear context, e.g. "New chat" button):
+
+```json
+{
+  "message": "Hi, what's on sale?",
+  "new_chat": true
 }
 ```
 
@@ -1733,6 +1743,8 @@ With optional thread (e.g. for resuming a session):
 
 - **message** – The agent’s reply, sanitized for display: no product IDs or exact stock numbers (e.g. “in stock” instead of “stock count is 95”). Use this as the chat bubble text. Do not show product IDs to the user.
 - **productIds** – Array of product IDs (from tool results and reply). Use only for “View game” links (e.g. `/products/:id`) and for **GET /api/products/:id**; do not display these IDs in the chat.
+- **orderId** – Present when a purchase was completed in this turn. Use for "View order" links (e.g. `/orders/:id`).
+- **invoiceId** – Present when a purchase was completed in this turn. Use for "View invoice" links (e.g. `/orders/:id/invoice` or `/api/invoices/:id`).
 - **thread_id** – Present when a thread was used (server-generated or client-sent). Reuse in subsequent requests to keep the same conversation thread.
 - **user_id** – Present when the user is authenticated; used for long-term memory (preferences). For display or debugging only; do not rely for authorization.
 
@@ -1751,7 +1763,7 @@ Same **POST /api/chat** endpoint and body; only the response format changes.
 |--------------------------|-------------|
 | `{ "type": "thinking", "content": "…" }` | Optional. Agent text before calling a tool (e.g. “Searching the catalog…”). Use to show a “thinking” state; do not show as the main reply. |
 | `{ "type": "chunk", "content": "…" }` | A piece of the **final answer** only. Append `content` to the displayed reply. |
-| `{ "type": "done", "productIds": ["…"], "message": "…", "thread_id": "…", "user_id": "…", "orderId": "…", "invoiceId": "…", "mockPaymentUrl": "…", "paymentId": "…" }` | Stream finished. **productIds**: use only for "View game" links (do not show to the user). **message**: optional sanitized full reply (no product IDs or exact stock numbers); use for display when present. **thread_id** / **user_id**: optional; same meaning as non-stream response. **orderId**: when the agent completes an order (e.g. after buy_for_me), include the order ID so the frontend can show an order card linking to `/orders/:id`. **invoiceId**: when the invoice is created after payment confirm, include the invoice ID; frontend shows an invoice card linking to `/orders/:orderId/invoice`. **mockPaymentUrl**: when the agent creates a payment for an order, include the mock payment URL (e.g. `/pay/&lt;id&gt;`) so the frontend can show a "Complete payment" button. **paymentId**: when payment is created, include the payment ID for the payment link. |
+| `{ "type": "done", "productIds": ["…"], "message": "…", "orderId": "…", "invoiceId": "…", "thread_id": "…", "user_id": "…" }` | Stream finished. **productIds**: use only for "View game" links (do not show to the user). **message**: optional sanitized full reply (no product IDs or exact stock numbers); use for display when present. **orderId** / **invoiceId**: present when a purchase was completed; use for "View order" / "View invoice" links. **thread_id** / **user_id**: optional; same meaning as non-stream response. |
 | `{ "type": "error", "message": "…" }` | Stream failed (e.g. LLM error). Only sent on server error during stream. |
 
 **Example (streaming)**
@@ -1779,7 +1791,23 @@ Returns messages for a thread. Query: `thread_id` (optional, default: `{user_id}
 |--------|--------------------|------|
 | GET    | `/api/chat/threads` | Yes  |
 
-Returns threads with at least one message. Response: `{ "threads": [{ "threadId", "lastMessageAt" }] }`.
+Returns threads with at least one message. Response: `{ "threads": [{ "threadId", "lastMessageAt", "title" }] }`. **title** is LLM-generated from the first message by default; users can rename via **PATCH /api/chat/threads/:threadId**. May be null for new threads. Each user is limited to 3 threads; the oldest is deleted when a new one is started.
+
+### Delete a chat thread
+
+| Method | Path                        | Auth |
+|--------|-----------------------------|------|
+| DELETE | `/api/chat/threads/:threadId` | Yes  |
+
+Deletes a thread and all its messages for the authenticated user. Only the thread owner can delete it. Response: `{ "deleted": true, "deletedCount": 5 }` where `deletedCount` is the number of messages removed.
+
+### Rename a chat thread
+
+| Method | Path                        | Auth |
+|--------|-----------------------------|------|
+| PATCH  | `/api/chat/threads/:threadId` | Yes  |
+
+Renames a thread. By default, thread titles are LLM-generated from the first message; users can override with a custom name. Request body: `{ "title": "My custom name" }`. Title is trimmed and limited to 100 characters. Response: `{ "updated": true, "title": "My custom name" }`. Returns 404 if the thread does not exist or does not belong to the user.
 
 **Guardrails**
 
@@ -1794,14 +1822,9 @@ Returns threads with at least one message. Response: `{ "threads": [{ "threadId"
 4. For each id in `data.productIds`, show a link to the product page (e.g. `/products/698c2768a7dee4fffd793738`).
 5. On the product page, use **GET /api/products/:id** for full details and **GET /api/products/:id/reviews** for the review list.
 6. For multi-thread support: call **GET /api/chat/threads** to list threads; pass `threadId` as `thread_id` when sending messages.
-7. **Buy flow (two-turn, MCQ cards)**: When the user says "Buy X for me" or "Purchase X", the agent asks for **both** address and payment. The frontend shows a **step-by-step MCQ** with cards:
-   - **Address cards**: One card per address from **GET /api/addresses** (label, city, state, isDefault badge). User selects one.
-   - **Payment cards**: Card, UPI, Net Banking (values: `mock_card`, `mock_upi`, `mock_netbanking`). User selects one.
-   - **Confirm purchase** button sends `{addressId}, {paymentValue}` (e.g. `69871e11a8dc56917a984a38, mock_upi`).
-   - The LLM may return addresses as `{ id, label, city, state, isDefault }` and payments as `{ value, label }`; the frontend uses **GET /api/addresses** and fixed payment options for the card UI.
-   - Show "Add address first" link when the user has no addresses.
-   - Refresh the cart (**GET /api/cart**) after each agent reply so the navbar cart count updates when the agent adds to cart.
-8. **Order completion**: When the agent returns `orderId` in the `done` event, show a "View order" link to `/orders/:orderId`. When the agent returns `mockPaymentUrl` or `paymentId`, show a "Complete payment" button linking to `/pay/:paymentId` so the user can confirm and capture the payment.
+7. To clear context and start fresh: send `new_chat: true` with the message; use the returned `thread_id` for subsequent messages in that conversation.
+8. To delete a thread: call **DELETE /api/chat/threads/:threadId** with the thread id from the threads list.
+9. To rename a thread: call **PATCH /api/chat/threads/:threadId** with body `{ "title": "Custom name" }`. Titles are LLM-generated by default; users can override.
 
 **Error (400)** – Validation or guardrail (empty message, too long, or blocked content)
 
@@ -2105,6 +2128,8 @@ Returns dashboard metrics and chart data: overview KPIs, revenue and orders by p
 | PATCH | `/api/notifications/read` | Yes | Notifications |
 | PATCH | `/api/notifications/read-all` | Yes | Notifications |
 | POST | `/api/chat` | Yes | Chat (Games Q&A) |
+| DELETE | `/api/chat/threads/:threadId` | Yes | Delete chat thread |
+| PATCH | `/api/chat/threads/:threadId` | Yes | Rename chat thread |
 | GET | `/api/invoices/:id` | Yes | Invoices |
 | GET | `/api/admin/analytics` | Yes (admin) | Admin |
 | GET | `/api/admin/orders` | Yes (admin) | Admin |

@@ -22,13 +22,13 @@ export default function ChatBuyConfirmation({
   const canConfirm = selectedAddressId && selectedPayment;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div>
-        <p className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1.5">
-          <MapPin className="h-3.5 w-3.5" />
-          Select address
+        <p className="text-[10px] font-medium text-gray-500 mb-1 flex items-center gap-1">
+          <MapPin className="h-3 w-3" />
+          Address
         </p>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5">
           {addresses.map((addr) => {
             const id = addr._id || addr.id;
             const label = addr.label || 'Address';
@@ -40,23 +40,23 @@ export default function ChatBuyConfirmation({
                 type="button"
                 onClick={() => onSelectAddress(id)}
                 disabled={disabled}
-                className={`flex min-w-0 items-start gap-2 rounded-lg border px-3 py-2.5 text-left text-sm transition-all ${
+                className={`flex min-w-0 items-start gap-1.5 rounded border px-2 py-1.5 text-left text-xs transition-all ${
                   isSelected
-                    ? 'border-gray-900 bg-gray-50 ring-2 ring-gray-900 ring-offset-1'
-                    : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
+                    ? 'border-gray-900 bg-gray-50 ring-1 ring-gray-900'
+                    : 'border-gray-200 bg-white hover:border-gray-300'
                 } disabled:opacity-50`}
               >
                 <span
-                  className={`mt-0.5 h-4 w-4 shrink-0 rounded-full border-2 ${
+                  className={`mt-0.5 h-3 w-3 shrink-0 rounded-full border ${
                     isSelected ? 'border-gray-900 bg-gray-900' : 'border-gray-300'
                   }`}
                   aria-hidden
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium text-gray-900">{label}</p>
-                  {location && <p className="text-xs text-gray-500">{location}</p>}
+                  <p className="font-medium text-gray-900 truncate">{label}</p>
+                  {location && <p className="text-[10px] text-gray-500 truncate">{location}</p>}
                   {addr.isDefault && (
-                    <span className="mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-medium text-gray-600 bg-gray-100">
+                    <span className="mt-0.5 inline-block rounded px-1 py-0.5 text-[9px] font-medium text-gray-500 bg-gray-100">
                       Default
                     </span>
                   )}
@@ -68,11 +68,11 @@ export default function ChatBuyConfirmation({
       </div>
 
       <div>
-        <p className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1.5">
-          <CreditCard className="h-3.5 w-3.5" />
-          Select payment method
+        <p className="text-[10px] font-medium text-gray-500 mb-1 flex items-center gap-1">
+          <CreditCard className="h-3 w-3" />
+          Payment
         </p>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5">
           {PAYMENT_OPTIONS.map((opt) => {
             const isSelected = selectedPayment === opt.value;
             return (
@@ -81,14 +81,14 @@ export default function ChatBuyConfirmation({
                 type="button"
                 onClick={() => onSelectPayment(opt.value)}
                 disabled={disabled}
-                className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm transition-all ${
+                className={`flex items-center gap-1.5 rounded border px-2 py-1.5 text-xs transition-all ${
                   isSelected
-                    ? 'border-gray-900 bg-gray-50 ring-2 ring-gray-900 ring-offset-1'
-                    : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
+                    ? 'border-gray-900 bg-gray-50 ring-1 ring-gray-900'
+                    : 'border-gray-200 bg-white hover:border-gray-300'
                 } disabled:opacity-50`}
               >
                 <span
-                  className={`h-4 w-4 shrink-0 rounded-full border-2 ${
+                  className={`h-3 w-3 shrink-0 rounded-full border ${
                     isSelected ? 'border-gray-900 bg-gray-900' : 'border-gray-300'
                   }`}
                   aria-hidden
@@ -104,7 +104,7 @@ export default function ChatBuyConfirmation({
         type="button"
         onClick={onConfirm}
         disabled={!canConfirm || disabled}
-        className="w-full rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50 disabled:hover:bg-gray-900"
+        className="w-full rounded bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50"
       >
         Confirm purchase
       </button>

@@ -6,6 +6,8 @@ import UserMenu from './UserMenu.jsx';
 import NotificationBell from './NotificationBell.jsx';
 import RecentPurchasesToasts from './RecentPurchasesToasts.jsx';
 import ProductAlertToasts from './ProductAlertToasts.jsx';
+import Toast from './Toast.jsx';
+import ConfirmationModal from './ConfirmationModal.jsx';
 import GameQAChat from './GameQAChat.jsx';
 
 const iconClass = 'w-5 h-5 text-gray-900';
@@ -22,6 +24,8 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
+      <Toast />
+      <ConfirmationModal />
       <RecentPurchasesToasts />
       <ProductAlertToasts />
       {!isLandingOrRegister && (

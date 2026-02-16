@@ -1,4 +1,4 @@
-import { BASE_URL, getToken } from './client.js';
+import { BASE_URL, getToken, api } from './client.js';
 
 /**
  * Get chat history for a thread. Use when opening the chat to restore previous messages.
@@ -26,6 +26,53 @@ export async function getChatHistory(options = {}) {
   const messages = Array.isArray(payload?.messages) ? payload.messages : [];
   const threadId = payload?.thread_id ?? payload?.threadId ?? null;
   return { messages, threadId };
+}
+
+/**
+ * List user's chat threads (max 3). Use for chat history sidebar.
+ * @returns {Promise<{ threads: Array<{ threadId: string, lastMessageAt?: string }> }>}
+ */
+export async function getChatThreads() {
+  const token = getToken();
+  const url = `${BASE_URL}/api/chat/threads`;
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(data?.message || res.statusText || 'Request failed');
+    err.status = res.status;
+    err.data = data;
+    throw err;
+  }
+  const payload = data?.data ?? data;
+  const threads = Array.isArray(payload?.threads) ? payload.threads : [];
+  return { threads };
+}
+
+/**
+ * Delete a chat thread and all its messages.
+ * @param {string} threadId
+ * @returns {Promise<{ deleted: boolean, deletedCount?: number }>}
+ */
+export async function deleteChatThread(threadId) {
+  const res = await api(`/api/chat/threads/${threadId}`, { method: 'DELETE' });
+  return res?.data ?? res;
+}
+
+/**
+ * Rename a chat thread.
+ * @param {string} threadId
+ * @param {string} title - New title (trimmed, max 100 chars)
+ * @returns {Promise<{ updated: boolean, title: string }>}
+ */
+export async function renameChatThread(threadId, title) {
+  const res = await api(`/api/chat/threads/${threadId}`, {
+    method: 'PATCH',
+    body: { title: String(title).trim().slice(0, 100) },
+  });
+  return res?.data ?? res;
 }
 
 /**
@@ -69,11 +116,12 @@ export async function sendMessage(message, options = {}) {
  * @param {string} message - User message
  * @param {{ threadId?: string, onChunk: (content: string) => void, onDone: (productIds: string[], threadId?: string | null, meta?: { orderId?: string, invoiceId?: string, mockPaymentUrl?: string, paymentId?: string }) => void, onThinking?: (content: string) => void, onError?: (message: string) => void }} callbacks
  */
-export async function sendMessageStream(message, { threadId, onChunk, onDone, onThinking, onError }) {
+export async function sendMessageStream(message, { threadId, newChat, onChunk, onDone, onThinking, onError }) {
   const token = getToken();
   const url = `${BASE_URL}/api/chat?stream=1`;
   const body = { message };
   if (threadId) body.thread_id = threadId;
+  if (newChat) body.new_chat = true;
   const res = await fetch(url, {
     method: 'POST',
     headers: {

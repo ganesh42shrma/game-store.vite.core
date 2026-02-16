@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { MessageCircle, X, Send, Gamepad2 } from 'lucide-react';
+import { MessageCircle, X, Send, Gamepad2, Plus, ChevronDown, ChevronRight, History, MoreVertical, Pencil, Trash2 } from 'lucide-react';
 import * as chatApi from '../api/chat.js';
 import { getAddresses } from '../api/addresses.js';
 import ChatGameCard from './ChatGameCard.jsx';
@@ -8,6 +8,7 @@ import ChatOrderCard from './ChatOrderCard.jsx';
 import ChatInvoiceCard from './ChatInvoiceCard.jsx';
 import ChatBuyConfirmation from './ChatBuyConfirmation.jsx';
 import { useCart } from '../context/CartContext.jsx';
+import { useConfirmation } from '../hooks/useConfirmation.js';
 
 const SUGGESTED_QUESTIONS = [
   'What games are on sale?',
@@ -18,6 +19,7 @@ const SUGGESTED_QUESTIONS = [
 
 export default function GameQAChat() {
   const { refreshCart } = useCart();
+  const confirm = useConfirmation();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [threadId, setThreadId] = useState(null);
@@ -29,8 +31,15 @@ export default function GameQAChat() {
   const [addresses, setAddresses] = useState([]);
   const [selectedAddressId, setSelectedAddressId] = useState(null);
   const [selectedPayment, setSelectedPayment] = useState(null);
+  const [threads, setThreads] = useState([]);
+  const [historyExpanded, setHistoryExpanded] = useState(false);
+  const [isNewChat, setIsNewChat] = useState(false);
+  const [popoverThreadId, setPopoverThreadId] = useState(null);
+  const [editingThreadId, setEditingThreadId] = useState(null);
+  const [editTitleValue, setEditTitleValue] = useState('');
   const messagesEndRef = useRef(null);
   const panelRef = useRef(null);
+  const popoverRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -64,11 +73,26 @@ export default function GameQAChat() {
   useEffect(() => {
     if (!open) return;
     const onEscape = (e) => {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape') {
+        setOpen(false);
+        setPopoverThreadId(null);
+        setEditingThreadId(null);
+      }
     };
     document.addEventListener('keydown', onEscape);
     return () => document.removeEventListener('keydown', onEscape);
   }, [open]);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (popoverRef.current && !popoverRef.current.contains(e.target)) {
+        setPopoverThreadId(null);
+        setEditingThreadId(null);
+      }
+    }
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
 
   // Load addresses when panel opens (for quick actions in buy flow)
   useEffect(() => {
@@ -78,15 +102,24 @@ export default function GameQAChat() {
       .catch(() => setAddresses([]));
   }, [open]);
 
+  // Load threads when panel opens (for chat history tab)
+  useEffect(() => {
+    if (!open) return;
+    chatApi
+      .getChatThreads()
+      .then(({ threads: list }) => setThreads(list.slice(0, 3)))
+      .catch(() => setThreads([]));
+  }, [open, messages.length]);
+
   // Reset buy confirmation selection when messages change (e.g. new agent reply)
   useEffect(() => {
     setSelectedAddressId(null);
     setSelectedPayment(null);
   }, [messages.length]);
 
-  // Load chat history when panel opens (persisted session)
+  // Load chat history when panel opens or thread changes
   useEffect(() => {
-    if (!open) return;
+    if (!open || isNewChat) return;
     let cancelled = false;
     setHistoryLoading(true);
     setError(null);
@@ -99,6 +132,7 @@ export default function GameQAChat() {
           role: m.role === 'assistant' ? 'assistant' : 'user',
           content: m.content || '',
           productIds: m.productIds && Array.isArray(m.productIds) ? m.productIds : [],
+          meta: m.meta,
         }));
         setMessages(mapped);
       })
@@ -111,7 +145,65 @@ export default function GameQAChat() {
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, [open, threadId]);
+
+  const handleNewChat = () => {
+    setIsNewChat(true);
+    setThreadId(null);
+    setMessages([]);
+    setError(null);
+  };
+
+  const handleSwitchThread = (tid) => {
+    setIsNewChat(false);
+    setThreadId(tid);
+    setHistoryExpanded(false);
+    setPopoverThreadId(null);
+    setEditingThreadId(null);
+  };
+
+  const handleDeleteThread = async (tid) => {
+    setPopoverThreadId(null);
+    try {
+      await chatApi.deleteChatThread(tid);
+      setThreads((prev) => prev.filter((t) => (t.threadId ?? t.thread_id) !== tid));
+      if (threadId === tid && !isNewChat) {
+        const remaining = threads.filter((t) => (t.threadId ?? t.thread_id) !== tid);
+        if (remaining.length > 0) {
+          handleSwitchThread(remaining[0].threadId ?? remaining[0].thread_id);
+        } else {
+          setIsNewChat(true);
+          setThreadId(null);
+          setMessages([]);
+        }
+      }
+    } catch (err) {
+      setError(err?.message || 'Failed to delete thread');
+    }
+  };
+
+  const handleSaveRename = async (tid) => {
+    const title = editTitleValue.trim();
+    if (!title) return;
+    try {
+      await chatApi.renameChatThread(tid, title);
+      setThreads((prev) =>
+        prev.map((t) =>
+          (t.threadId ?? t.thread_id) === tid ? { ...t, title } : t
+        )
+      );
+      setEditingThreadId(null);
+      setEditTitleValue('');
+      setPopoverThreadId(null);
+    } catch (err) {
+      setError(err?.message || 'Failed to rename thread');
+    }
+  };
+
+  const handleCancelRename = () => {
+    setEditingThreadId(null);
+    setEditTitleValue('');
+  };
 
   const handleSend = async (text, options = {}) => {
     const msg = (text || input).trim();
@@ -126,7 +218,8 @@ export default function GameQAChat() {
 
     try {
       await chatApi.sendMessageStream(msg, {
-        threadId: threadId || undefined,
+        threadId: isNewChat ? undefined : (threadId || undefined),
+        newChat: isNewChat,
         onThinking(content) {
           setThinkingText(content || 'Thinking…');
         },
@@ -143,7 +236,11 @@ export default function GameQAChat() {
         },
         onDone(ids, tid, meta = {}) {
           productIds = ids;
-          if (tid) setThreadId(tid);
+          if (tid) {
+            setThreadId(tid);
+            setIsNewChat(false);
+            chatApi.getChatThreads().then(({ threads: list }) => setThreads(list.slice(0, 3)));
+          }
           setThinkingText(null);
           refreshCart();
           setMessages((prev) => {
@@ -202,40 +299,185 @@ export default function GameQAChat() {
             className="flex h-full w-full max-w-full flex-col bg-white shadow-xl sm:max-w-md md:max-w-lg min-w-0"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex shrink-0 items-center justify-between border-b border-gray-200 px-3 py-2.5 sm:px-4 sm:py-3">
+            <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-3 py-2">
               <div className="flex min-w-0 items-center gap-2">
-                <Gamepad2 className="h-5 w-5 shrink-0 text-gray-700" />
-                <h2 className="truncate text-base font-semibold text-gray-900 sm:text-lg">Ask about games</h2>
+                <Gamepad2 className="h-4 w-4 shrink-0 text-gray-500" />
+                <h2 className="truncate text-sm font-semibold text-gray-900">
+                  {isNewChat
+                    ? 'New chat'
+                    : (() => {
+                        const t = threads.find((x) => (x.threadId ?? x.thread_id) === threadId);
+                        return t?.title || 'Chat';
+                      })()}
+                </h2>
               </div>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
-                aria-label="Close chat"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <div className="flex items-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={handleNewChat}
+                  className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                  aria-label="New chat"
+                  title="New chat"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                  aria-label="Close chat"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 py-2 sm:px-4 sm:py-3">
+            <div className="shrink-0 border-b border-gray-50">
+              <button
+                type="button"
+                onClick={() => setHistoryExpanded((e) => !e)}
+                className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-xs text-gray-500 hover:bg-gray-50"
+                aria-expanded={historyExpanded}
+              >
+                {historyExpanded ? (
+                  <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+                ) : (
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+                )}
+                <History className="h-3.5 w-3.5 shrink-0" />
+                <span>History</span>
+                {threads.length > 0 && (
+                  <span className="text-gray-400">· {threads.length}</span>
+                )}
+              </button>
+              {historyExpanded && (
+                <div className="border-t border-gray-50 px-2 py-1.5">
+                  {threads.length === 0 ? (
+                    <p className="px-2 py-2 text-xs text-gray-400">No conversations yet</p>
+                  ) : (
+                    <ul className="space-y-0.5" ref={popoverRef}>
+                      {threads.map((t, i) => {
+                        const tid = t.threadId ?? t.thread_id;
+                        const isActive = tid === threadId && !isNewChat;
+                        const title = t.title || `Chat ${i + 1}`;
+                        const dateStr = t.lastMessageAt
+                          ? new Date(t.lastMessageAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+                          : null;
+                        const isPopoverOpen = popoverThreadId === tid;
+                        const isEditing = editingThreadId === tid;
+                        return (
+                          <li key={tid} className="relative flex items-center gap-0.5 rounded group">
+                            <button
+                              type="button"
+                              onClick={() => handleSwitchThread(tid)}
+                              className={`min-w-0 flex-1 rounded px-2 py-1 text-left text-xs ${isActive ? 'bg-gray-100 text-gray-900 font-medium' : 'text-gray-600 hover:bg-gray-50'}`}
+                            >
+                              <span className="truncate block">{title}</span>
+                            </button>
+                            {dateStr && (
+                              <span className="shrink-0 text-[10px] text-gray-400 w-12 text-right">{dateStr}</span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPopoverThreadId(isPopoverOpen ? null : tid);
+                                if (isPopoverOpen) setEditingThreadId(null);
+                              }}
+                              className="shrink-0 rounded p-0.5 text-gray-400 opacity-70 hover:opacity-100 hover:bg-gray-200"
+                              aria-label="Thread options"
+                            >
+                              <MoreVertical className="h-3.5 w-3.5" />
+                            </button>
+                            {isPopoverOpen && (
+                              <div className="absolute right-0 top-full z-10 mt-0.5 w-40 rounded-md border border-gray-200 bg-white py-0.5 shadow-lg">
+                                {isEditing ? (
+                                  <div className="px-2 py-1.5 space-y-1.5">
+                                    <input
+                                      type="text"
+                                      value={editTitleValue}
+                                      onChange={(e) => setEditTitleValue(e.target.value)}
+                                      placeholder="Thread title"
+                                      maxLength={100}
+                                      className="w-full rounded border border-gray-200 px-2 py-1 text-xs"
+                                      autoFocus
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                    <div className="flex gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSaveRename(tid)}
+                                        disabled={!editTitleValue.trim()}
+                                        className="flex-1 rounded bg-gray-900 px-2 py-0.5 text-xs text-white hover:bg-gray-800 disabled:opacity-50"
+                                      >
+                                        Save
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => { handleCancelRename(); setPopoverThreadId(null); }}
+                                        className="rounded border border-gray-200 px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-50"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => { setEditingThreadId(tid); setEditTitleValue(t.title || ''); }}
+                                      className="flex w-full items-center gap-1.5 px-2 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50"
+                                    >
+                                      <Pencil className="h-3 w-3" />
+                                      Rename
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        confirm({
+                                          title: 'Delete conversation?',
+                                          message: 'This cannot be undone.',
+                                          confirmLabel: 'Delete',
+                                          variant: 'danger',
+                                          onConfirm: () => handleDeleteThread(tid),
+                                        });
+                                      }}
+                                      className="flex w-full items-center gap-1.5 px-2 py-1.5 text-left text-xs text-red-600 hover:bg-red-50"
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                      Delete
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 py-2">
               {historyLoading && (
                 <div className="flex items-center justify-center py-8">
                   <p className="text-sm text-gray-500">Loading conversation…</p>
                 </div>
               )}
               {!historyLoading && messages.length === 0 && (
-                <div className="space-y-3">
-                  <p className="text-sm text-gray-600">
-                    Ask about games, prices, stock, sales, or reviews. I can add to cart, buy games for you, and create alerts. When you say &quot;Buy X for me&quot;, I&apos;ll ask for address and payment in one reply—e.g. &quot;Default address, UPI&quot; or use the quick buttons below.
+                <div className="space-y-2">
+                  <p className="text-xs text-gray-500">
+                    Ask about games, prices, stock, or buy. I can add to cart and create alerts.
                   </p>
-                  <p className="text-xs font-medium text-gray-500">Suggested questions:</p>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1.5">
                     {SUGGESTED_QUESTIONS.map((q) => (
                       <button
                         key={q}
                         type="button"
                         onClick={() => handleSuggested(q)}
-                        className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-left text-sm text-gray-700 transition hover:border-gray-300 hover:bg-gray-100"
+                        className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-left text-xs text-gray-600 hover:border-gray-300 hover:bg-gray-100"
                       >
                         {q}
                       </button>
@@ -245,14 +487,14 @@ export default function GameQAChat() {
               )}
               {!historyLoading && (
                 <>
-                  <ul className="space-y-3 sm:space-y-4">
+                  <ul className="space-y-2">
                     {messages.map((m, i) => (
                       <li
                         key={i}
                         className={`flex min-w-0 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
                       >
                         <div
-                          className={`max-w-[85%] min-w-0 rounded-2xl px-3 py-2 text-sm sm:px-4 sm:py-2.5 ${
+                          className={`max-w-[85%] min-w-0 rounded-xl px-3 py-2 text-sm ${
                             m.role === 'user'
                               ? 'bg-gray-900 text-white'
                               : m.error
@@ -306,7 +548,7 @@ export default function GameQAChat() {
                   </ul>
                   {loading && (
                     <div className="flex justify-start">
-                      <div className="rounded-2xl bg-gray-100 px-4 py-2.5 text-sm text-gray-500">
+                      <div className="rounded-xl bg-gray-100 px-3 py-2 text-xs text-gray-500">
                         <span className="animate-pulse">{thinkingText ?? 'Thinking…'}</span>
                       </div>
                     </div>
@@ -317,7 +559,7 @@ export default function GameQAChat() {
             </div>
 
             {error && (
-              <div className="border-t border-gray-100 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+              <div className="shrink-0 border-t border-amber-100 bg-amber-50 px-3 py-1.5 text-xs text-amber-800">
                 {error}
               </div>
             )}
@@ -340,7 +582,7 @@ export default function GameQAChat() {
                   ? `${selectedAddr.label || 'Address'}, ${paymentLabels[selectedPayment] || selectedPayment}`
                   : null;
                 return (
-                  <div className="shrink-0 border-t border-gray-100 bg-gray-50/50 px-3 py-3 sm:px-4">
+                  <div className="shrink-0 border-t border-gray-50 bg-gray-50/50 px-3 py-2">
                     <ChatBuyConfirmation
                       addresses={addresses}
                       selectedAddressId={selectedAddressId}
@@ -363,8 +605,8 @@ export default function GameQAChat() {
               }
 
               return (
-                <div className="shrink-0 border-t border-gray-100 bg-gray-50/50 px-3 py-2 sm:px-4">
-                  <p className="text-xs font-medium text-gray-500 mb-1.5">Quick reply:</p>
+                <div className="shrink-0 border-t border-gray-50 bg-gray-50/50 px-3 py-2">
+                  <p className="text-[10px] font-medium text-gray-400 mb-1">Quick reply</p>
                   <div className="flex flex-wrap gap-2">
                     {asksAddress && !hasAddresses && (
                       <Link
@@ -419,7 +661,7 @@ export default function GameQAChat() {
             })()}
 
             <form
-              className="shrink-0 border-t border-gray-200 p-2 sm:p-3"
+              className="shrink-0 border-t border-gray-100 p-2"
               onSubmit={(e) => {
                 e.preventDefault();
                 handleSend();
@@ -430,16 +672,16 @@ export default function GameQAChat() {
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Ask about games, or reply to questions…"
+                  placeholder="Ask about games…"
                   maxLength={2000}
                   disabled={loading}
-                  className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:border-gray-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-gray-400 disabled:opacity-60 sm:px-4 sm:py-2.5"
+                  className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:border-gray-300 focus:bg-white focus:outline-none focus:ring-1 focus:ring-gray-300 disabled:opacity-60"
                   aria-label="Message"
                 />
                 <button
                   type="submit"
                   disabled={loading || !input.trim()}
-                  className="rounded-xl bg-gray-900 px-4 py-2.5 text-white transition hover:bg-gray-800 disabled:opacity-50 disabled:hover:bg-gray-900"
+                  className="rounded-lg bg-gray-900 px-3 py-2 text-white text-sm hover:bg-gray-800 disabled:opacity-50"
                   aria-label="Send"
                 >
                   <Send className="h-5 w-5" />
