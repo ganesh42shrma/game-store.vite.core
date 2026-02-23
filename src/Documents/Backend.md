@@ -1413,6 +1413,146 @@ There is no real payment gateway; the frontend simulates “redirect to payment�
 
 ---
 
+## Razorpay (real gateway) integration
+
+Use these endpoints to integrate Razorpay Checkout in the storefront. Ensure `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` are set in your server environment (e.g. `.env`).
+
+Base path: `/api/payments/razorpay`
+
+### Create Razorpay order
+| Method | Path | Auth |
+|--------|------|------|
+| POST | `/api/payments/razorpay/create-order` | Yes |
+
+Creates a Razorpay Order for an existing `Order` in the app.
+
+Request body
+
+```json
+{ "orderId": "<app order id>" }
+```
+
+Response (200)
+
+```json
+{
+  "key": "<RAZORPAY_KEY_ID>",
+  "order": { "id": "order_ABC...", "amount": 14160, "currency": "INR" },
+  "appOrderId": "<app order id>"
+}
+```
+
+Notes:
+- `order.amount` is in paise (integer). Use this when initializing Razorpay Checkout.
+- Backend creates a `Payment` document and stores the Razorpay order id in the payment record.
+
+### Verify / capture Razorpay payment
+| Method | Path | Auth |
+|--------|------|------|
+| POST | `/api/payments/razorpay/verify` | Yes |
+
+Verify the client-side payment success by validating the HMAC signature and marking the order paid.
+
+Request body
+
+```json
+{
+  "razorpay_order_id": "<razorpay order id>",
+  "razorpay_payment_id": "<razorpay payment id>",
+  "razorpay_signature": "<signature>",
+  "appOrderId": "<app order id>"
+}
+```
+
+Response (200)
+
+```json
+{ "success": true, "result": { /* payment + order info */ } }
+```
+
+What happens server-side:
+- Validates HMAC-SHA256 signature using `RAZORPAY_KEY_SECRET`.
+- Updates `Payment` status to `captured`, sets `gatewayPaymentId` to the Razorpay payment id and `capturedAt`.
+- Updates the `Order` to `paymentStatus: "paid"`, `status: "completed"`, sets `paidAt` and links the payment id.
+- Creates an invoice and emits a recent-purchase SSE event (if configured).
+
+### Webhooks (recommended)
+- Optional: configure Razorpay webhooks in your Razorpay dashboard and add a secure `POST /api/payments/razorpay/webhook` endpoint to handle async events (`payment.failed`, `payment.captured`, `refund.*`). Verify webhook signatures and reconcile state.
+
+### Frontend (Vite + React) integration — minimal flow
+
+1. Create an app order via your normal checkout flow (POST `/api/orders`) and obtain `orderId`.
+2. From your React payment page call POST `/api/payments/razorpay/create-order` with `{ orderId }`.
+   - Receive `{ key, order: { id, amount, currency }, appOrderId }`.
+3. Load the Razorpay Checkout script and open the Checkout with these options:
+
+```jsx
+// Minimal React example (call on button click)
+async function startRazorpayCheckout(appOrderId, token, user) {
+  const res = await fetch(`${API_BASE}/api/payments/razorpay/create-order`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ orderId: appOrderId }),
+  });
+  const data = await res.json();
+  const { key, order } = data;
+
+  const options = {
+    key,
+    amount: order.amount,
+    currency: order.currency,
+    name: 'Game Store',
+    description: `Order ${data.appOrderId}`,
+    order_id: order.id,
+    handler: async function(response){
+      // send to server for verification
+      await fetch(`${API_BASE}/api/payments/razorpay/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          razorpay_order_id: response.razorpay_order_id,
+          razorpay_payment_id: response.razorpay_payment_id,
+          razorpay_signature: response.razorpay_signature,
+          appOrderId: data.appOrderId,
+        }),
+      });
+      // on success: navigate to order success page
+    },
+    prefill: { email: user?.email, name: user?.name },
+    theme: { color: '#F37254' },
+  };
+
+  const script = document.createElement('script');
+  script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+  script.onload = () => { new window.Razorpay(options).open(); };
+  document.body.appendChild(script);
+}
+```
+
+Notes for frontend:
+- Only the `key` (RAZORPAY_KEY_ID) is public; the secret must remain server-side.
+- The handler receives `razorpay_payment_id`, `razorpay_order_id`, `razorpay_signature` — always POST these plus your `appOrderId` to `/api/payments/razorpay/verify` for server-side verification.
+- Handle network failures and display appropriate success/error pages to users.
+
+### Quick curl smoke-tests
+
+1. Create order (server must have `RAZORPAY_*` env vars):
+
+```bash
+curl -X POST -H "Authorization: Bearer <token>" -H "Content-Type: application/json" \
+  -d '{"orderId":"<appOrderId>"}' http://localhost:5000/api/payments/razorpay/create-order
+```
+
+2. Verify (use values returned by Razorpay client after a successful checkout):
+
+```bash
+curl -X POST -H "Authorization: Bearer <token>" -H "Content-Type: application/json" \
+  -d '{"razorpay_order_id":"<id>","razorpay_payment_id":"<id>","razorpay_signature":"<sig>","appOrderId":"<appOrderId>"}' \
+  http://localhost:5000/api/payments/razorpay/verify
+```
+
+---
+
 ## Events (SSE – recent purchases)
 
 Used to power **"Someone from X just purchased Y"** toast notifications on the storefront. When a payment is confirmed, the server pushes a **recent-purchase** event to all connected SSE clients. This is **real-time push to the browser**, not an outgoing webhook.
@@ -1757,25 +1897,30 @@ To receive the reply as a **Server-Sent Events (SSE)** stream (token-by-token), 
 
 Same **POST /api/chat** endpoint and body; only the response format changes.
 
-**Response (200)** – `Content-Type: text/event-stream`. Each line is an SSE event. **Tool output (e.g. raw catalog JSON) is never sent**; only the agent’s text is exposed. The stream separates **thinking** (text before the agent calls a tool) from the **answer** (final reply after tool use).
+**Response (200)** – `Content-Type: text/event-stream`. Each line is an SSE event. **Tool output (e.g. raw catalog JSON) is never sent**; only the agent’s text is exposed. The stream emits **thinking** events (status updates like "Browsing catalog...") and **chunk** events (parts of the final text reply).
 
 | Event `data` (JSON)      | Description |
 |--------------------------|-------------|
-| `{ "type": "thinking", "content": "…" }` | Optional. Agent text before calling a tool (e.g. “Searching the catalog…”). Use to show a “thinking” state; do not show as the main reply. |
-| `{ "type": "chunk", "content": "…" }` | A piece of the **final answer** only. Append `content` to the displayed reply. |
+| `{ "type": "thinking", "message": "…" }` | Status update (e.g. “Browsing the catalog…”, “Checking stock…”). Show this in a loading indicator; do not append to the chat history. |
+| `{ "type": "chunk", "content": "…" }` | A piece of the **final answer**. Append `content` to the displayed reply. |
 | `{ "type": "done", "productIds": ["…"], "message": "…", "orderId": "…", "invoiceId": "…", "thread_id": "…", "user_id": "…" }` | Stream finished. **productIds**: use only for "View game" links (do not show to the user). **message**: optional sanitized full reply (no product IDs or exact stock numbers); use for display when present. **orderId** / **invoiceId**: present when a purchase was completed; use for "View order" / "View invoice" links. **thread_id** / **user_id**: optional; same meaning as non-stream response. |
 | `{ "type": "error", "message": "…" }` | Stream failed (e.g. LLM error). Only sent on server error during stream. |
 
 **Example (streaming)**
 
 ```
-data: {"type":"thinking","content":"Searching for RPGs under $30..."}
-data: {"type":"chunk","content":"Here "}
-data: {"type":"chunk","content":"are some RPGs under $30: The Witcher 3 (product id: 698b1e2a82d35cab4bb1b1eb) is on sale at $29.99."}
-data: {"type":"done","productIds":["698b1e2a82d35cab4bb1b1eb"]}
+data: {"type":"thinking","message":"Browsing the catalog..."}
+data: {"type":"thinking","message":"Reading reviews for Hades..."}
+data: {"type":"chunk","content":"Hades "}
+data: {"type":"chunk","content":"is currently in stock and highly rated."}
+data: {"type":"done","productIds":["698b1e2a82d35cab4bb1b1eb"], "message": "Hades is currently in stock and highly rated."}
 ```
 
-**Frontend (streaming):** Use `fetch()` with `Accept: text/event-stream` and `Authorization: Bearer <token>`. Parse each `data:` line as JSON: show `thinking` only in a “thinking” state (or hide it); append `chunk` to build the answer. On `done`: use **productIds** only for "View game" links (do not display them); if **message** is present, use it as the final display text (sanitized: no product IDs or exact stock numbers). Raw tool data is never included in the stream.
+**Frontend (streaming):** Use `fetch()` with `Accept: text/event-stream` and `Authorization: Bearer <token>`. Parse each `data:` line as JSON:
+- **thinking**: Update your UI's loading/status indicator with `data.message`.
+- **chunk**: Append `data.content` to the chat bubble.
+- **done**: stream complete. Hide loading indicator. Use `productIds` for links.
+- **error**: Handle error.
 
 ### Get chat history
 

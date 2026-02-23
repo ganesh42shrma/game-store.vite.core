@@ -190,7 +190,7 @@ export default function ProductReviews({ productId, product, user, isAdmin, onRe
           {myReviewLoading ? (
             <p className="text-sm text-gray-500">Loading…</p>
           ) : showReviewForm ? (
-            <form onSubmit={handleSubmitReview} className="space-y-3 max-w-xl">
+            <form onSubmit={handleSubmitReview} className="space-y-3 max-w-xl" aria-busy={formSubmitting}>
               <div>
                 <label className="block text-sm text-gray-600 mb-1">Rating (1–5)</label>
                 <div className="flex gap-1">
@@ -201,6 +201,7 @@ export default function ProductReviews({ productId, product, user, isAdmin, onRe
                       onClick={() => setFormRating(r)}
                       className="p-1 rounded hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300"
                       aria-label={`${r} star${r > 1 ? 's' : ''}`}
+                      aria-pressed={formRating === r}
                     >
                       <Star
                         className={`w-8 h-8 ${formRating >= r ? 'fill-amber-400 text-amber-400' : 'text-gray-300'}`}
@@ -215,8 +216,9 @@ export default function ProductReviews({ productId, product, user, isAdmin, onRe
                   value={formComment}
                   onChange={(e) => setFormComment(e.target.value.slice(0, MAX_COMMENT_LENGTH))}
                   rows={4}
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-gray-900 focus:ring-2 focus:ring-gray-400 focus:border-gray-400"
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-gray-900 focus:ring-2 focus:ring-gray-400 focus:border-gray-400 disabled:opacity-50"
                   placeholder="Share your experience with this game..."
+                  disabled={formSubmitting}
                 />
                 <p className="text-xs text-gray-500 mt-0.5">{formComment.length}/{MAX_COMMENT_LENGTH}</p>
               </div>
@@ -224,8 +226,9 @@ export default function ProductReviews({ productId, product, user, isAdmin, onRe
                 <button
                   type="submit"
                   disabled={formSubmitting}
-                  className="px-4 py-2 bg-gray-900 text-white rounded border border-gray-900 hover:bg-gray-800 disabled:opacity-50"
+                  className="px-4 py-2 bg-gray-900 text-white rounded border border-gray-900 hover:bg-gray-800 disabled:opacity-50 flex items-center gap-2"
                 >
+                  {formSubmitting && <span className="animate-spin h-3 w-3 border-2 border-white border-t-transparent rounded-full" />}
                   {formSubmitting ? 'Saving…' : isMyReview ? 'Update review' : 'Submit review'}
                 </button>
                 {editingReview && (
@@ -233,6 +236,7 @@ export default function ProductReviews({ productId, product, user, isAdmin, onRe
                     type="button"
                     onClick={() => { setEditingReview(false); setFormError(null); }}
                     className="px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50"
+                    disabled={formSubmitting}
                   >
                     Cancel
                   </button>
@@ -241,7 +245,7 @@ export default function ProductReviews({ productId, product, user, isAdmin, onRe
                   <button
                     type="button"
                     onClick={handleDeleteReview}
-                    disabled={deleteSubmitting}
+                    disabled={deleteSubmitting || formSubmitting}
                     className="px-4 py-2 border border-red-300 text-red-700 rounded hover:bg-red-50 disabled:opacity-50 flex items-center gap-1"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -249,7 +253,7 @@ export default function ProductReviews({ productId, product, user, isAdmin, onRe
                   </button>
                 )}
               </div>
-              {formError && <p className="text-sm text-red-600">{formError}</p>}
+              {formError && <p className="text-sm text-red-600" role="alert">{formError}</p>}
             </form>
           ) : isMyReview ? (
             <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 max-w-xl">
@@ -264,8 +268,8 @@ export default function ProductReviews({ productId, product, user, isAdmin, onRe
                   {myReview.updatedAt
                     ? new Date(myReview.updatedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
                     : myReview.createdAt
-                    ? new Date(myReview.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
-                    : ''}
+                      ? new Date(myReview.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+                      : ''}
                 </span>
               </div>
               {myReview.comment && (
@@ -322,17 +326,17 @@ export default function ProductReviews({ productId, product, user, isAdmin, onRe
                     <span className="text-xs text-gray-500">
                       {rev.updatedAt
                         ? new Date(rev.updatedAt).toLocaleDateString(undefined, {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                          })
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                        })
                         : rev.createdAt
-                        ? new Date(rev.createdAt).toLocaleDateString(undefined, {
+                          ? new Date(rev.createdAt).toLocaleDateString(undefined, {
                             year: 'numeric',
                             month: 'short',
                             day: 'numeric',
                           })
-                        : ''}
+                          : ''}
                     </span>
                   </div>
                   {rev.comment && (

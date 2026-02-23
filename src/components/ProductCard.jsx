@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { addCartItem } from '../api/cart.js';
 import { getSellingPrice, isOnSale } from '../utils/productPrice.js';
 
-export default function ProductCard({ product, variant }) {
+function ProductCard({ product, variant }) {
   const { user, isAdmin } = useAuth();
   const { getQuantity, refreshCart } = useCart();
   const navigate = useNavigate();
@@ -58,11 +58,10 @@ export default function ProductCard({ product, variant }) {
 
   const isSaleSection = variant === 'sale';
   return (
-    <div className={`group rounded-lg overflow-hidden transition-shadow flex flex-col relative ${
-      isSaleSection
+    <div className={`group rounded-lg overflow-hidden transition-shadow flex flex-col relative ${isSaleSection
         ? 'border-2 border-amber-300 bg-amber-50/70 hover:shadow-md hover:border-amber-400'
         : 'border border-gray-200 bg-white hover:shadow-sm'
-    }`}>
+      }`}>
       {onSale && (
         <span className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded text-xs font-semibold bg-amber-500 text-white shadow">
           Sale
@@ -144,3 +143,5 @@ export default function ProductCard({ product, variant }) {
     </div>
   );
 }
+
+export default memo(ProductCard);

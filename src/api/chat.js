@@ -162,8 +162,14 @@ export async function sendMessageStream(message, { threadId, newChat, onChunk, o
             // Only final-answer chunks are shown as the reply. Never show tool/DB output.
             if (event.type === 'chunk' && typeof event.content === 'string') {
               onChunk(event.content);
-            } else if (event.type === 'thinking' && typeof event.content === 'string') {
-              onThinking?.(event.content);
+            } else if (event.type === 'thinking') {
+              const msg = event.message || event.content;
+              console.log('[chat] "thinking" event received:', event, 'msg:', msg);
+              onThinking?.(msg && typeof msg === 'string' && msg.trim() ? msg : 'Thinking...');
+            } else if (event.type === 'tool_call' || event.type === 'tool_use') {
+              console.log('[chat] "tool_call" event received:', event);
+              const toolName = event.function?.name || event.tool?.name || event.tool || event.name || 'unknown tool';
+              onThinking?.(`Using tool: ${toolName}...`);
             } else if (event.type === 'done') {
               productIds = Array.isArray(event.productIds) ? event.productIds : [];
               const tid = event.thread_id ?? event.threadId ?? null;

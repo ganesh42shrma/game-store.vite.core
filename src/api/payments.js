@@ -1,29 +1,19 @@
 import { api } from './client.js';
 
-function unwrap(res) {
+/** Create a Razorpay order for an existing app order. Returns { key, order, appOrderId } */
+export async function createRazorpayOrder({ orderId }) {
+  const res = await api('/api/payments/razorpay/create-order', {
+    method: 'POST',
+    body: { orderId },
+  });
   return res?.data ?? res;
 }
 
-/** Creates a payment for an order. Returns { payment, mockPaymentUrl }. */
-export async function createPayment({ orderId, method }) {
-  const res = await api('/api/payments', {
+/** Verify/capture a Razorpay payment on the server. */
+export async function verifyRazorpayPayment({ razorpay_order_id, razorpay_payment_id, razorpay_signature, appOrderId }) {
+  const res = await api('/api/payments/razorpay/verify', {
     method: 'POST',
-    body: { orderId, method },
+    body: { razorpay_order_id, razorpay_payment_id, razorpay_signature, appOrderId },
   });
-  return {
-    payment: res?.data?.payment ?? res?.payment,
-    mockPaymentUrl: res?.data?.mockPaymentUrl ?? res?.mockPaymentUrl,
-  };
-}
-
-export async function getPayment(id) {
-  const res = await api(`/api/payments/${id}`);
-  return unwrap(res);
-}
-
-export async function confirmPayment(id) {
-  const res = await api(`/api/payments/${id}/confirm`, {
-    method: 'POST',
-  });
-  return unwrap(res);
+  return res?.data ?? res;
 }

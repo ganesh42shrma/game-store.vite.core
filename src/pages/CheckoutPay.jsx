@@ -1,31 +1,28 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams, useParams, useNavigate, Link } from 'react-router-dom';
+import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { getOrder } from '../api/orders.js';
-import { createPayment, getPayment, confirmPayment } from '../api/payments.js';
+import { createRazorpayOrder, verifyRazorpayPayment } from '../api/payments.js';
 
 const CURRENCY = '$';
 const PAYMENT_METHODS = [
-  { value: 'mock_upi', label: 'UPI (mock)' },
-  { value: 'mock_card', label: 'Card (mock)' },
-  { value: 'mock_netbanking', label: 'Net banking (mock)' },
+  { value: 'razorpay', label: 'Razorpay' },
 ];
 
 export default function CheckoutPay() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { paymentId } = useParams();
   const orderIdFromQuery = searchParams.get('orderId');
 
   const [order, setOrder] = useState(null);
-  const [payment, setPayment] = useState(null);
-  const [paymentMethod, setPaymentMethod] = useState('mock_upi');
+  const [rzData, setRzData] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState('razorpay');
   const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState(null);
 
-  const orderId = order?.user ? order._id : order?.order ?? payment?.order;
+  
 
   useEffect(() => {
     if (!user) {
@@ -34,31 +31,6 @@ export default function CheckoutPay() {
     }
 
     let cancelled = false;
-
-    if (paymentId) {
-      getPayment(paymentId)
-        .then((p) => {
-          if (!cancelled) {
-            setPayment(p);
-            const oid = typeof p?.order === 'object' ? p?.order?._id : p?.order;
-            if (oid) {
-              return getOrder(oid).then((o) => {
-                setOrder(o);
-              });
-            }
-            if (p?.order) setOrder({ _id: p.order });
-          }
-        })
-        .catch((err) => {
-          if (!cancelled) {
-            setError(err.message || err.data?.message || 'Payment not found');
-          }
-        })
-        .finally(() => {
-          if (!cancelled) setLoading(false);
-        });
-      return () => { cancelled = true; };
-    }
 
     if (orderIdFromQuery) {
       getOrder(orderIdFromQuery)
@@ -76,53 +48,92 @@ export default function CheckoutPay() {
       return () => { cancelled = true; };
     }
 
-    setError('Missing order or payment.');
+    setError('Missing order.');
     setLoading(false);
-  }, [user, paymentId, orderIdFromQuery]);
+  }, [user, orderIdFromQuery]);
 
+  // Removed mock payment creation: Razorpay is the only supported flow.
+
+  // When Razorpay is selected, pre-create a Razorpay order (authenticated).
   useEffect(() => {
-    if (!orderIdFromQuery || !order?._id || payment != null) return;
-    if (order.paymentStatus === 'paid') {
-      setError('Order is already paid.');
-      return;
+    let cancelled = false;
+    if (paymentMethod !== 'razorpay' || !order?._id) {
+      setRzData(null);
+      return () => { cancelled = true; };
     }
 
-    let cancelled = false;
-    createPayment({ orderId: order._id, method: paymentMethod })
-      .then(({ payment: p }) => {
-        if (!cancelled && p) setPayment(p);
+    createRazorpayOrder({ orderId: order._id })
+      .then((res) => {
+        if (!cancelled) setRzData(res);
       })
       .catch((err) => {
-        if (!cancelled) {
-          setError(err.message || err.data?.message || 'Failed to create payment');
-        }
+        if (!cancelled) setError(err?.data?.message || err.message || 'Failed to create Razorpay order');
       });
+
     return () => { cancelled = true; };
-  }, [orderIdFromQuery, order?._id, order?.paymentStatus, paymentMethod]);
+  }, [paymentMethod, order?._id]);
 
   const handlePayNow = async () => {
-    const pid = payment?._id ?? paymentId;
-    if (!pid) {
-      setError('Payment not ready.');
-      return;
-    }
-    setConfirming(true);
-    setError(null);
-    try {
-      await confirmPayment(pid);
-      const oid = order?._id ?? payment?.order;
-      navigate(oid ? `/orders/${oid}/success` : '/orders');
-    } catch (err) {
-      const msg = err?.data?.message || err.message;
-      if (msg && msg.toLowerCase().includes('already captured')) {
-        const oid = order?._id ?? payment?.order;
-        navigate(oid ? `/orders/${oid}/success` : '/orders');
+    // Razorpay flow: create order, open checkout, then verify on success.
+    if (paymentMethod === 'razorpay') {
+      if (!order?._id) {
+        setError('Order not ready.');
         return;
       }
-      setError(msg || 'Payment failed');
-    } finally {
-      setConfirming(false);
+      setConfirming(true);
+      setError(null);
+      try {
+        const res = rzData ?? await createRazorpayOrder({ orderId: order._id });
+        const { key, order: rzOrder, appOrderId } = res;
+
+        // load Razorpay script
+        await new Promise((resolve, reject) => {
+          if (window.Razorpay) return resolve();
+          const s = document.createElement('script');
+          s.src = 'https://checkout.razorpay.com/v1/checkout.js';
+          s.onload = resolve;
+          s.onerror = () => reject(new Error('Failed to load Razorpay SDK'));
+          document.body.appendChild(s);
+        });
+
+        const options = {
+          key: key,
+          amount: rzOrder.amount,
+          currency: rzOrder.currency || 'INR',
+          order_id: rzOrder.id,
+          name: 'Game Store',
+          description: `Order ${appOrderId}`,
+          handler: async function (response) {
+            try {
+              await verifyRazorpayPayment({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                appOrderId,
+              });
+              navigate(`/orders/${appOrderId}/success`);
+            } catch (err) {
+              setError(err?.data?.message || err.message || 'Verification failed');
+            }
+          },
+          prefill: {
+            name: user?.name,
+            email: user?.email,
+          },
+          theme: { color: '#111827' },
+        };
+
+        const rzp = new window.Razorpay(options);
+        rzp.open();
+      } catch (err) {
+        setError(err?.data?.message || err.message || 'Razorpay failed');
+      } finally {
+        setConfirming(false);
+      }
+      return;
     }
+
+    // No other payment methods supported.
   };
 
   if (!user) {
@@ -153,18 +164,17 @@ export default function CheckoutPay() {
     );
   }
 
-  const displayOrder = order || (payment?.order && typeof payment.order === 'object' ? payment.order : null);
-  const totalAmount = displayOrder?.totalAmount ?? payment?.amount ?? 0;
+  const displayOrder = order;
+  const totalAmount = displayOrder?.totalAmount ?? 0;
   const subTotal = displayOrder?.subTotal ?? totalAmount;
   const gstAmount = displayOrder?.gstAmount ?? 0;
   const gstRate = displayOrder?.gstRate;
   const billingAddress = displayOrder?.billingAddress;
   const items = displayOrder?.items ?? [];
-  const payId = payment?._id ?? paymentId;
-  const isPaid = displayOrder?.paymentStatus === 'paid' || payment?.status === 'captured';
+  const isPaid = displayOrder?.paymentStatus === 'paid';
 
   if (isPaid) {
-    const oid = displayOrder?._id ?? payment?.order;
+    const oid = displayOrder?._id;
     return (
       <div>
         <p className="text-green-600 mb-4">This order is already paid.</p>
@@ -221,20 +231,7 @@ export default function CheckoutPay() {
           </div>
         </div>
 
-        {!paymentId && order?.paymentStatus !== 'paid' && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Payment method (mock)</label>
-            <select
-              value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value)}
-              className="w-full border border-gray-300 rounded px-3 py-2 text-gray-900"
-            >
-              {PAYMENT_METHODS.map((m) => (
-                <option key={m.value} value={m.value}>{m.label}</option>
-              ))}
-            </select>
-          </div>
-        )}
+        {/* Razorpay only — no payment method selector */}
       </div>
 
       {error && <p className="mt-2 text-red-600 text-sm">{error}</p>}
@@ -243,7 +240,7 @@ export default function CheckoutPay() {
         <button
           type="button"
           onClick={handlePayNow}
-          disabled={!payId || confirming}
+          disabled={((!(rzData && rzData.order)) || confirming)}
           className="px-4 py-2 bg-gray-900 text-white rounded border border-gray-900 disabled:opacity-50"
         >
           {confirming ? 'Processing…' : 'Pay now'}

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, memo } from 'react';
 import { Link } from 'react-router-dom';
 import { MessageCircle, X, Send, Gamepad2, Plus, ChevronDown, ChevronRight, History, MoreVertical, Pencil, Trash2 } from 'lucide-react';
 import * as chatApi from '../api/chat.js';
@@ -17,7 +17,65 @@ const SUGGESTED_QUESTIONS = [
   'Buy Elden Ring for me',
 ];
 
+const ChatMessage = memo(function ChatMessage({ m, onNavigate }) {
+  return (
+    <li className={`flex min-w-0 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+      <div
+        className={`max-w-[85%] min-w-0 rounded-xl px-3 py-2 text-sm ${m.role === 'user'
+          ? 'bg-gray-900 text-white'
+          : m.error
+            ? 'bg-red-50 text-red-800'
+            : 'bg-gray-100 text-gray-900'
+          }`}
+      >
+        {(m.content || m.error) && (
+          <p className="whitespace-pre-wrap wrap-break-word">{m.content}</p>
+        )}
+        {m.productIds?.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2 border-t border-gray-200/50 pt-2 sm:gap-3">
+            {m.productIds.map((id) => (
+              <ChatGameCard
+                key={id}
+                productId={id}
+                onNavigate={onNavigate}
+              />
+            ))}
+          </div>
+        )}
+        {m.role === 'assistant' && (m.meta?.orderId || m.meta?.invoiceId || m.meta?.mockPaymentUrl || m.meta?.paymentId) && (
+          <div className="mt-2 flex flex-wrap gap-2 border-t border-gray-200/50 pt-2">
+            {m.meta?.orderId && (
+              <ChatOrderCard
+                orderId={m.meta.orderId}
+                onNavigate={onNavigate}
+              />
+            )}
+            {m.meta?.invoiceId && m.meta?.orderId && (
+              <ChatInvoiceCard
+                orderId={m.meta.orderId}
+                invoiceId={m.meta.invoiceId}
+                onNavigate={onNavigate}
+              />
+            )}
+            {(m.meta?.mockPaymentUrl || m.meta?.paymentId) && (
+              <Link
+                to={m.meta.mockPaymentUrl?.startsWith('/') ? m.meta.mockPaymentUrl : `/pay/${m.meta.paymentId || ''}`}
+                onClick={onNavigate}
+                className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-100"
+              >
+                Complete payment →
+              </Link>
+            )}
+          </div>
+        )}
+      </div>
+    </li>
+  );
+});
+
 export default function GameQAChat() {
+  // ... existing component code
+
   const { refreshCart } = useCart();
   const confirm = useConfirmation();
   const [open, setOpen] = useState(false);
@@ -221,6 +279,7 @@ export default function GameQAChat() {
         threadId: isNewChat ? undefined : (threadId || undefined),
         newChat: isNewChat,
         onThinking(content) {
+          console.log('[GameQAChat] onThinking called with:', content);
           setThinkingText(content || 'Thinking…');
         },
         onChunk(content) {
@@ -306,9 +365,9 @@ export default function GameQAChat() {
                   {isNewChat
                     ? 'New chat'
                     : (() => {
-                        const t = threads.find((x) => (x.threadId ?? x.thread_id) === threadId);
-                        return t?.title || 'Chat';
-                      })()}
+                      const t = threads.find((x) => (x.threadId ?? x.thread_id) === threadId);
+                      return t?.title || 'Chat';
+                    })()}
                 </h2>
               </div>
               <div className="flex items-center gap-0.5">
@@ -489,67 +548,17 @@ export default function GameQAChat() {
                 <>
                   <ul className="space-y-2">
                     {messages.map((m, i) => (
-                      <li
+                      <ChatMessage
                         key={i}
-                        className={`flex min-w-0 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                      >
-                        <div
-                          className={`max-w-[85%] min-w-0 rounded-xl px-3 py-2 text-sm ${
-                            m.role === 'user'
-                              ? 'bg-gray-900 text-white'
-                              : m.error
-                                ? 'bg-red-50 text-red-800'
-                                : 'bg-gray-100 text-gray-900'
-                          }`}
-                        >
-                          {(m.content || m.error) && (
-                            <p className="whitespace-pre-wrap wrap-break-word">{m.content}</p>
-                          )}
-                          {m.productIds?.length > 0 && (
-                            <div className="mt-2 flex flex-wrap gap-2 border-t border-gray-200/50 pt-2 sm:gap-3">
-                              {m.productIds.map((id) => (
-                                <ChatGameCard
-                                  key={id}
-                                  productId={id}
-                                  onNavigate={() => setOpen(false)}
-                                />
-                              ))}
-                            </div>
-                          )}
-                          {m.role === 'assistant' && (m.meta?.orderId || m.meta?.invoiceId || m.meta?.mockPaymentUrl || m.meta?.paymentId) && (
-                            <div className="mt-2 flex flex-wrap gap-2 border-t border-gray-200/50 pt-2">
-                              {m.meta?.orderId && (
-                                <ChatOrderCard
-                                  orderId={m.meta.orderId}
-                                  onNavigate={() => setOpen(false)}
-                                />
-                              )}
-                              {m.meta?.invoiceId && m.meta?.orderId && (
-                                <ChatInvoiceCard
-                                  orderId={m.meta.orderId}
-                                  invoiceId={m.meta.invoiceId}
-                                  onNavigate={() => setOpen(false)}
-                                />
-                              )}
-                              {(m.meta?.mockPaymentUrl || m.meta?.paymentId) && (
-                                <Link
-                                  to={m.meta.mockPaymentUrl?.startsWith('/') ? m.meta.mockPaymentUrl : `/pay/${m.meta.paymentId || ''}`}
-                                  onClick={() => setOpen(false)}
-                                  className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-100"
-                                >
-                                  Complete payment →
-                                </Link>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </li>
+                        m={m}
+                        onNavigate={() => setOpen(false)}
+                      />
                     ))}
                   </ul>
                   {loading && (
                     <div className="flex justify-start">
                       <div className="rounded-xl bg-gray-100 px-3 py-2 text-xs text-gray-500">
-                        <span className="animate-pulse">{thinkingText ?? 'Thinking…'}</span>
+                        <span className="animate-pulse">{thinkingText || 'Thinking…'}</span>
                       </div>
                     </div>
                   )}
